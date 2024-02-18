@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 use std::{
     error::Error,
@@ -7,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use chrono::{DateTime, Utc};
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
@@ -128,6 +128,16 @@ fn ui(frame: &mut Frame) {
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);
     let now: DateTime<Utc> = Utc::now();
-    let paragraph = Paragraph::new(Line::from(now.to_string()).centered()).block(block);
+    let battery = get_battery();
+    let paragraph =
+        Paragraph::new(Line::from(now.to_string() + " | " + battery.as_str()).centered())
+            .block(block);
     frame.render_widget(paragraph, layout[0]);
+}
+
+fn get_battery() -> String {
+    let manager = battery::Manager::new().unwrap();
+    let battery = manager.batteries().unwrap().nth(0).unwrap().unwrap();
+    let percentage = battery.state_of_charge().value * 100.0;
+    format!("{}%", percentage)
 }
