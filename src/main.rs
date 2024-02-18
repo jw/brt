@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use std::path::PathBuf;
 use std::{
     error::Error,
@@ -11,7 +12,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::{debug, info, LevelFilter};
+use log::{info, LevelFilter};
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
@@ -22,6 +23,8 @@ use ratatui::{
 };
 
 const LOG_PATTERN: &str = "{d(%Y-%m-%d %H:%M:%S)} | {l} | {f}:{L} | {m}{n}";
+const NAME: &str = env!("CARGO_PKG_NAME");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // These type aliases are used to make the code more readable by reducing repetition of the generic
 // types. They are not necessary for the functionality of the code.
@@ -30,8 +33,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 fn main() -> Result<()> {
     initialize_logging();
-    debug!("Hello there!");
-    info!("This is brt. Version yokemebob.");
+    info!("This is {NAME}. Version {}.", VERSION);
     let mut terminal = setup_terminal()?;
     let result = run(&mut terminal);
     restore_terminal(terminal)?;
@@ -125,6 +127,7 @@ fn ui(frame: &mut Frame) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);
-    let paragraph = Paragraph::new(Line::from("The clock comes here.").centered()).block(block);
+    let now: DateTime<Utc> = Utc::now();
+    let paragraph = Paragraph::new(Line::from(now.to_string()).centered()).block(block);
     frame.render_widget(paragraph, layout[0]);
 }
