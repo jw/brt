@@ -7,6 +7,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use clap::Parser;
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
@@ -31,9 +32,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {}
+
 fn main() -> Result<()> {
     initialize_logging();
-    info!("This is {NAME}. Version {}.", VERSION);
+    info!("{NAME} ({VERSION}) started.");
+
+    let _cli = Cli::parse();
+
     let mut terminal = setup_terminal()?;
     let result = run(&mut terminal);
     restore_terminal(terminal)?;
@@ -140,4 +148,15 @@ fn get_battery() -> String {
     let battery = manager.batteries().unwrap().nth(0).unwrap().unwrap();
     let percentage = battery.state_of_charge().value * 100.0;
     format!("{}%", percentage)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Cli;
+
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert()
+    }
 }
