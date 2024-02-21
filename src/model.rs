@@ -1,7 +1,7 @@
 use log::info;
 use procfs::process::{all_processes, Stat};
 
-pub fn get_processes() -> () {
+pub fn get_processes() {
     // Get all processes
     let processes: Vec<ProcessEntry> = match all_processes() {
         Err(err) => {
