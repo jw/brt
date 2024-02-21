@@ -1,6 +1,6 @@
 [package]
 name = "brt"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Jan Willems <jw@elevenbits.com>"]
 keywords = ["terminal", "btop"]
 repository = "https://github.com/jw/brt"
