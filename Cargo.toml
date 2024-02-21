@@ -1,11 +1,14 @@
 [package]
 name = "brt"
 version = "0.1.1"
+authors = ["Jan Willems <jw@elevenbits.com>"]
+keywords = ["terminal", "btop"]
+repository = "https://github.com/jw/brt"
+readme = "README.md"
 edition = "2021"
 description = "btop in rust"
 license = "EUPL-1.2"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
 name = "brt"
