@@ -5,7 +5,6 @@ use std::{
     time::Duration,
 };
 
-use ::log::info;
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use crossterm::{
@@ -13,12 +12,13 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use log::info;
 use ratatui::{
     prelude::*,
     widgets::{block::Title, Block, BorderType, Borders, Padding, Paragraph},
 };
 
-mod log;
+mod logger;
 mod model;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
@@ -34,7 +34,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 struct Cli {}
 
 fn main() -> Result<()> {
-    log::initialize_logging();
+    logger::initialize_logging();
     info!("{NAME} ({VERSION}) started.");
 
     let _cli = Cli::parse();
