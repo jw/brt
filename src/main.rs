@@ -89,26 +89,23 @@ fn ui(frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(100)])
         .split(frame.size());
+
+    // get the model
+    let now: DateTime<Utc> = Utc::now();
+    let battery = model::get_battery();
+    model::get_processes();
+
     let block = Block::default()
         .title(Title::from("brt").alignment(Alignment::Center))
         .padding(Padding::new(0, 0, frame.size().height / 2 - 1, 0))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);
-    let now: DateTime<Utc> = Utc::now();
-    let battery = get_battery();
-    model::get_processes();
     let paragraph =
         Paragraph::new(Line::from(now.to_string() + " | " + battery.as_str()).centered())
             .block(block);
-    frame.render_widget(paragraph, layout[0]);
-}
 
-fn get_battery() -> String {
-    let manager = battery::Manager::new().unwrap();
-    let battery = manager.batteries().unwrap().next().unwrap().unwrap();
-    let percentage = battery.state_of_charge().value * 100.0;
-    format!("{}%", percentage)
+    frame.render_widget(paragraph, layout[0]);
 }
 
 #[cfg(test)]
