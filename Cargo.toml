@@ -8,7 +8,7 @@ readme = "README.md"
 edition = "2021"
 description = "btop in rust"
 license = "EUPL-1.2"
-
+rust-version = "1.74.1"
 
 [[bin]]
 name = "brt"
