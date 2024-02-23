@@ -156,6 +156,14 @@ fn ui(frame: &mut Frame) {
 
     info!("Battery: {}", model::get_battery());
 
+    let header = ["pid", "ppid", "command", "threads", "user", "mem", "cpu"]
+        .iter()
+        .cloned()
+        .map(Cell::from)
+        .collect::<Row>()
+        // .style(header_style)
+        .height(1);
+
     let _block = Block::default()
         .title(Title::from("brt").alignment(Alignment::Center))
         .padding(Padding::new(0, 0, frame.size().height / 2 - 1, 0))
@@ -172,7 +180,7 @@ fn ui(frame: &mut Frame) {
         Percentage(5),
         Percentage(5),
     ];
-    let table = Table::new(rows, widths);
+    let table = Table::new(rows, widths).header(header);
 
     frame.render_widget(table, layout[0]);
 }
