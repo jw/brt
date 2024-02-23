@@ -19,6 +19,7 @@ use ratatui::{
     prelude::*,
     widgets::{block::Title, Block, BorderType, Borders, Padding},
 };
+use uzers::get_user_by_uid;
 
 mod logger;
 mod model;
@@ -130,17 +131,35 @@ fn ui(frame: &mut Frame) {
                 cells.push(command);
                 let number_of_threads = Cell::new(stat.num_threads.to_string());
                 cells.push(number_of_threads);
+
+                let mut user_name: String = "unknown".to_string();
                 let uid_result = process.uid();
                 match uid_result {
-                    Ok(user) => {
-                        let user = Cell::new(user.to_string());
-                        cells.push(user);
+                    Ok(uid) => {
+                        let user_option = get_user_by_uid(uid);
+                        match user_option {
+                            Some(u) => {
+                                user_name = u.name().to_os_string().into_string().unwrap();
+                            }
+                            None => {
+                                warn!("Nu user found found for {}", process.pid().to_string());
+                            }
+                        }
+                        info!(
+                            "user {}; {}; {:?}",
+                            uid,
+                            process.pid().to_string(),
+                            user_name
+                        );
                     }
                     Err(_e) => {
                         warn!("Nu user found for {}", process.pid().to_string());
                         break;
                     }
                 }
+                let user = Cell::new(user_name);
+                cells.push(user);
+
                 let mem = Cell::new(stat.vsize.to_string());
                 cells.push(mem);
                 let cpu = Cell::new("n/a".to_string());
@@ -161,7 +180,6 @@ fn ui(frame: &mut Frame) {
         .cloned()
         .map(Cell::from)
         .collect::<Row>()
-        // .style(header_style)
         .height(1);
 
     let _block = Block::default()
