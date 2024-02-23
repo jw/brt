@@ -17,7 +17,7 @@ use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::{Cell, Row, Table};
 use ratatui::{
     prelude::*,
-    widgets::{block::Title, Block, BorderType, Borders, Padding},
+    widgets::{block::Title, Block, BorderType, Borders},
 };
 use uzers::get_user_by_uid;
 
@@ -175,16 +175,18 @@ fn ui(frame: &mut Frame) {
 
     info!("Battery: {}", model::get_battery());
 
-    let header = ["pid", "ppid", "command", "threads", "user", "mem", "cpu"]
-        .iter()
-        .cloned()
-        .map(Cell::from)
-        .collect::<Row>()
-        .height(1);
+    let header = [
+        "Pid:", "Ppid:", "Command:", "Threads:", "User:", "MemB", "Cpu%",
+    ]
+    .iter()
+    .cloned()
+    .map(Cell::from)
+    .collect::<Row>()
+    .height(1);
 
-    let _block = Block::default()
+    let block = Block::default()
         .title(Title::from("brt").alignment(Alignment::Center))
-        .padding(Padding::new(0, 0, frame.size().height / 2 - 1, 0))
+        // .padding(Padding::new(0, 0, frame.size().height / 2 - 1, 0))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);
@@ -198,7 +200,7 @@ fn ui(frame: &mut Frame) {
         Percentage(5),
         Percentage(5),
     ];
-    let table = Table::new(rows, widths).header(header);
+    let table = Table::new(rows, widths).block(block).header(header);
 
     frame.render_widget(table, layout[0]);
 }
