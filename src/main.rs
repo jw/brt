@@ -14,7 +14,7 @@ use crossterm::{
 use log::{info, warn};
 use procfs::process::{all_processes, Process};
 use ratatui::layout::Constraint::Percentage;
-use ratatui::widgets::{Cell, Row, Table};
+use ratatui::widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table};
 use ratatui::{
     prelude::*,
     widgets::{block::Title, Block, BorderType, Borders},
@@ -80,8 +80,10 @@ fn run(terminal: &mut Terminal) -> Result<()> {
 fn handle_events() -> Result<ControlFlow<()>> {
     if event::poll(Duration::from_millis(100))? {
         if let Event::Key(key) = event::read()? {
-            if let KeyCode::Char('q') = key.code {
-                return Ok(ControlFlow::Break(()));
+            use KeyCode::*;
+            match key.code {
+                Char('q') | Esc => return Ok(ControlFlow::Break(())),
+                _ => {}
             }
         }
     }
@@ -102,6 +104,12 @@ fn ui(frame: &mut Frame) {
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(100)])
         .split(frame.size());
+
+    //
+    // Model
+    //
+
+    info!("Battery: {}", model::get_battery());
 
     let mut rows = Vec::new();
     let all_processes: Vec<Process> = all_processes()
@@ -173,7 +181,18 @@ fn ui(frame: &mut Frame) {
         rows.push(Row::new(cells));
     }
 
-    info!("Battery: {}", model::get_battery());
+    //
+    // ui
+    //
+
+    let vertical_scroll = 0;
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+        .begin_symbol(Some("↑"))
+        .end_symbol(Some("↓"))
+        .track_symbol(Some(" "));
+
+    let mut scrollbar_state = ScrollbarState::new(rows.len()).position(vertical_scroll);
 
     let header = [
         "Pid:", "Ppid:", "Command:", "Threads:", "User:", "MemB", "Cpu%",
@@ -203,6 +222,14 @@ fn ui(frame: &mut Frame) {
     let table = Table::new(rows, widths).block(block).header(header);
 
     frame.render_widget(table, layout[0]);
+    frame.render_stateful_widget(
+        scrollbar,
+        layout[0].inner(&Margin {
+            vertical: 1,
+            horizontal: 1,
+        }),
+        &mut scrollbar_state,
+    );
 }
 
 #[cfg(test)]
