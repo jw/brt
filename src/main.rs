@@ -5,21 +5,23 @@ use std::{
     time::Duration,
 };
 
+use crate::model::BrtProcess;
 use clap::Parser;
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::{info, warn};
-use procfs::process::{all_processes, Process};
+use log::info;
+use procfs::process::Process;
 use ratatui::layout::Constraint::Percentage;
-use ratatui::widgets::{Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table};
+use ratatui::widgets::{
+    Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
+};
 use ratatui::{
     prelude::*,
     widgets::{block::Title, Block, BorderType, Borders},
 };
-use uzers::get_user_by_uid;
 
 mod logger;
 mod model;
@@ -36,6 +38,79 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 #[command(version, about, long_about = None)]
 struct Cli {}
 
+struct App {
+    state: TableState,
+    processes: Vec<BrtProcess>,
+    scrollbar_state: ScrollbarState,
+}
+
+impl App {
+    fn new() -> App {
+        let processes = model::get_processes(model::get_all_processes());
+        App {
+            state: TableState::default().with_selected(0),
+            scrollbar_state: ScrollbarState::new(processes.len() - 1),
+            processes,
+        }
+    }
+
+    pub fn next(&mut self) {
+        info!("next: len: {}.", self.processes.len());
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.processes.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        info!("up i: {}", i);
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+    }
+
+    pub fn previous(&mut self) {
+        info!("previous: len: {}.", self.processes.len());
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.processes.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        info!("down i: {}", i);
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+    }
+}
+
+#[allow(dead_code)]
+fn get_current_process() -> Process {
+    let me = Process::myself().unwrap();
+    let (virtual_mem, resident_mem) = get_memory(&me);
+    info!(
+        "Current pid {}; uses {}/{} bytes ({:02.2}%).",
+        me.pid,
+        virtual_mem,
+        resident_mem,
+        resident_mem as f64 / virtual_mem as f64 * 100.0
+    );
+    me
+}
+
+fn get_memory(process: &Process) -> (u64, u64) {
+    let stat = process.stat().unwrap();
+    let page_size = procfs::page_size();
+    let virtual_mem = stat.vsize;
+    let resident_mem = stat.rss * page_size;
+    (virtual_mem, resident_mem)
+}
+
 fn main() -> Result<()> {
     logger::initialize_logging();
     initialize_panic_handler();
@@ -44,7 +119,10 @@ fn main() -> Result<()> {
     let _cli = Cli::parse();
 
     let mut terminal = setup_terminal()?;
-    let result = run(&mut terminal);
+
+    let app = App::new();
+
+    let result = run(&mut terminal, app);
     restore_terminal(terminal)?;
 
     if let Err(err) = result {
@@ -68,21 +146,29 @@ fn restore_terminal(mut terminal: Terminal) -> Result<()> {
     Ok(())
 }
 
-fn run(terminal: &mut Terminal) -> Result<()> {
+fn run(terminal: &mut Terminal, mut app: App) -> Result<()> {
     loop {
-        terminal.draw(ui)?;
-        if handle_events()?.is_break() {
+        terminal.draw(|f| ui(f, &mut app))?;
+        if handle_events(terminal, &mut app)?.is_break() {
             return Ok(());
         }
     }
 }
 
-fn handle_events() -> Result<ControlFlow<()>> {
-    if event::poll(Duration::from_millis(100))? {
+fn handle_events(_terminal: &mut Terminal, app: &mut App) -> Result<ControlFlow<()>> {
+    if event::poll(Duration::from_millis(200))? {
         if let Event::Key(key) = event::read()? {
             use KeyCode::*;
             match key.code {
                 Char('q') | Esc => return Ok(ControlFlow::Break(())),
+                Char('j') | Down => {
+                    info!("Down!");
+                    app.next();
+                }
+                Char('k') | Up => {
+                    info!("Up!");
+                    app.previous();
+                }
                 _ => {}
             }
         }
@@ -99,100 +185,19 @@ pub fn initialize_panic_handler() {
     }));
 }
 
-fn ui(frame: &mut Frame) {
+fn ui(frame: &mut Frame, app: &mut App) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(100)])
+        .constraints([Percentage(100)])
         .split(frame.size());
 
-    //
-    // Model
-    //
-
-    info!("Battery: {}", model::get_battery());
-
-    let mut rows = Vec::new();
-    let all_processes: Vec<Process> = all_processes()
-        .expect("Can't read /proc")
-        .filter_map(|p| match p {
-            Ok(p) => Some(p),
-            Err(e) => match e {
-                procfs::ProcError::NotFound(_) => None,
-                procfs::ProcError::Io(_e, _path) => None,
-                x => {
-                    println!("Can't read process due to error {x:?}");
-                    None
-                }
-            },
-        })
-        .collect();
-    for process in all_processes {
-        let mut cells = Vec::new();
-        let stat_result = process.stat();
-        match stat_result {
-            Ok(stat) => {
-                let pid = Cell::new(stat.pid.to_string());
-                cells.push(pid);
-                let ppid = Cell::new(stat.ppid.to_string());
-                cells.push(ppid);
-                let command = Cell::new(stat.comm);
-                cells.push(command);
-                let number_of_threads = Cell::new(stat.num_threads.to_string());
-                cells.push(number_of_threads);
-
-                let mut user_name: String = "unknown".to_string();
-                let uid_result = process.uid();
-                match uid_result {
-                    Ok(uid) => {
-                        let user_option = get_user_by_uid(uid);
-                        match user_option {
-                            Some(u) => {
-                                user_name = u.name().to_os_string().into_string().unwrap();
-                            }
-                            None => {
-                                warn!("Nu user found found for {}", process.pid().to_string());
-                            }
-                        }
-                        info!(
-                            "user {}; {}; {:?}",
-                            uid,
-                            process.pid().to_string(),
-                            user_name
-                        );
-                    }
-                    Err(_e) => {
-                        warn!("Nu user found for {}", process.pid().to_string());
-                        break;
-                    }
-                }
-                let user = Cell::new(user_name);
-                cells.push(user);
-
-                let mem = Cell::new(stat.vsize.to_string());
-                cells.push(mem);
-                let cpu = Cell::new("n/a".to_string());
-                cells.push(cpu);
-            }
-            Err(_e) => {
-                warn!("Stat not found for {}", process.pid().to_string());
-                break;
-            }
-        }
-        rows.push(Row::new(cells));
-    }
-
-    //
-    // ui
-    //
-
-    let vertical_scroll = 0;
+    info!("Battery state is {}.", model::get_battery());
+    let rows = model::create_rows(&app.processes);
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"))
         .track_symbol(Some(" "));
-
-    let mut scrollbar_state = ScrollbarState::new(rows.len()).position(vertical_scroll);
 
     let header = [
         "Pid:", "Ppid:", "Command:", "Threads:", "User:", "MemB", "Cpu%",
@@ -201,11 +206,11 @@ fn ui(frame: &mut Frame) {
     .cloned()
     .map(Cell::from)
     .collect::<Row>()
-    .height(1);
+    .height(1)
+    .style(Style::default().bold());
 
     let block = Block::default()
         .title(Title::from("brt").alignment(Alignment::Center))
-        // .padding(Padding::new(0, 0, frame.size().height / 2 - 1, 0))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);
@@ -220,15 +225,15 @@ fn ui(frame: &mut Frame) {
         Percentage(5),
     ];
     let table = Table::new(rows, widths).block(block).header(header);
+    frame.render_stateful_widget(table, layout[0], &mut app.state);
 
-    frame.render_widget(table, layout[0]);
     frame.render_stateful_widget(
         scrollbar,
         layout[0].inner(&Margin {
             vertical: 1,
             horizontal: 1,
         }),
-        &mut scrollbar_state,
+        &mut app.scrollbar_state,
     );
 }
 
