@@ -199,8 +199,19 @@ fn ui(frame: &mut Frame, app: &mut App) {
         .end_symbol(Some("↓"))
         .track_symbol(Some(" "));
 
+    let selected_style = Style::default()
+        .bg(Color::Rgb(0x6a, 0x2f, 0x2f))
+        .fg(Color::White)
+        .add_modifier(Modifier::BOLD);
+
     let header = [
-        "Pid:", "Ppid:", "Command:", "Threads:", "User:", "MemB", "Cpu%",
+        Cell::new(Line::from("Pid:").alignment(Alignment::Right)),
+        Cell::new("Ppid:"),
+        Cell::new("Command:"),
+        Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
+        Cell::new("User:"),
+        Cell::new("MemB"),
+        Cell::new("Cpu%"),
     ]
     .iter()
     .cloned()
@@ -224,9 +235,13 @@ fn ui(frame: &mut Frame, app: &mut App) {
         Percentage(5),
         Percentage(5),
     ];
-    let table = Table::new(rows, widths).block(block).header(header);
-    frame.render_stateful_widget(table, layout[0], &mut app.state);
 
+    let table = Table::new(rows, widths)
+        .block(block)
+        .header(header)
+        .highlight_style(selected_style);
+
+    frame.render_stateful_widget(table, layout[0], &mut app.state);
     frame.render_stateful_widget(
         scrollbar,
         layout[0].inner(&Margin {

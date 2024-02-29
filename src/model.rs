@@ -1,6 +1,8 @@
 use log::warn;
 use procfs::process::{all_processes, Process};
-use ratatui::widgets::Row;
+use ratatui::layout::Alignment;
+use ratatui::text::Line;
+use ratatui::widgets::{Cell, Row};
 use uzers::{get_user_by_uid, User};
 
 pub fn get_battery() -> String {
@@ -28,13 +30,13 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
         "unknown".to_string()
     };
     Row::new([
-        process.pid.to_string(),
-        process.ppid.to_string(),
-        process.command.clone(),
-        process.number_of_threads.to_string(),
-        username,
-        process.virtual_memory.to_string(), // TODO: Get percentages
-        "n/a".to_string(),                  // TODO: Get CPU
+        Cell::new(Line::from(process.pid.to_string()).alignment(Alignment::Right)),
+        Cell::new(process.ppid.to_string()),
+        Cell::new(process.command.clone()),
+        Cell::new(Line::from(process.number_of_threads.to_string()).alignment(Alignment::Right)),
+        Cell::new(username),
+        Cell::new(process.virtual_memory.to_string()), // TODO: Get percentages
+        Cell::new("n/a".to_string()),                  // TODO: Get CPU
     ])
 }
 
