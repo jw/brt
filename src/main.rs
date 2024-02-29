@@ -15,6 +15,7 @@ use crossterm::{
 use log::info;
 use procfs::process::Process;
 use ratatui::layout::Constraint::Percentage;
+use ratatui::widgets::block::Position;
 use ratatui::widgets::{
     Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
 };
@@ -191,7 +192,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
         .constraints([Percentage(100)])
         .split(frame.size());
 
-    info!("Battery state is {}.", model::get_battery());
+    // info!("Battery state is {}.", model::get_battery());
     let rows = model::create_rows(&app.processes);
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -220,8 +221,16 @@ fn ui(frame: &mut Frame, app: &mut App) {
     .height(1)
     .style(Style::default().bold());
 
+    let processes = app.processes.len();
+    let process = format!("{}/{}", app.state.selected().unwrap() + 1, processes);
+
     let block = Block::default()
         .title(Title::from("brt").alignment(Alignment::Center))
+        .title(
+            Title::from(process)
+                .position(Position::Bottom)
+                .alignment(Alignment::Right),
+        )
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::White))
         .border_type(BorderType::Rounded);

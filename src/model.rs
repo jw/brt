@@ -5,6 +5,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row};
 use uzers::{get_user_by_uid, User};
 
+#[allow(dead_code)]
 pub fn get_battery() -> String {
     let manager = battery::Manager::new().unwrap();
     let battery = manager.batteries().unwrap().next().unwrap().unwrap();
