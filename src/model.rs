@@ -32,8 +32,8 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
     };
     Row::new([
         Cell::new(Line::from(process.pid.to_string()).alignment(Alignment::Right)),
-        Cell::new(process.ppid.to_string()),
-        Cell::new(process.command.clone()),
+        Cell::new(process.program.to_string()),
+        Cell::new(process.command.to_string()),
         Cell::new(Line::from(process.number_of_threads.to_string()).alignment(Alignment::Right)),
         Cell::new(username),
         Cell::new(process.virtual_memory.to_string()), // TODO: Get percentages
@@ -57,6 +57,7 @@ pub fn get_processes(all_processes: Vec<Process>) -> Vec<BrtProcess> {
 pub struct BrtProcess {
     pid: i32,
     ppid: i32,
+    program: String,
     command: String,
     number_of_threads: i64,
     user: Option<User>,
@@ -69,6 +70,7 @@ impl Default for BrtProcess {
         BrtProcess {
             pid: -1,
             ppid: -1,
+            program: "".to_string(),
             command: "".to_string(),
             number_of_threads: -1,
             user: None,
@@ -78,6 +80,14 @@ impl Default for BrtProcess {
     }
 }
 
+fn create_command(cmdline: &[String]) -> String {
+    let mut command = "".to_string();
+    for part in cmdline.iter() {
+        command += part;
+    }
+    command
+}
+
 fn create_process(process: &Process) -> Option<BrtProcess> {
     let mut brt_process: BrtProcess = Default::default();
     let stat_result = process.stat();
@@ -85,8 +95,19 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
         Ok(stat) => {
             brt_process.pid = stat.pid;
             brt_process.ppid = stat.ppid;
-            brt_process.command = stat.comm;
+            brt_process.program = stat.comm;
             brt_process.number_of_threads = stat.num_threads;
+
+            // command
+            let cmd_result = process.cmdline();
+            match cmd_result {
+                Ok(cmd) => {
+                    brt_process.command = create_command(&cmd);
+                }
+                Err(_e) => {
+                    brt_process.command = "zombie".to_string();
+                }
+            }
 
             // user
             let uid_result = process.uid();
