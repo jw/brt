@@ -56,7 +56,6 @@ impl App {
     }
 
     pub fn next(&mut self) {
-        info!("next: len: {}.", self.processes.len());
         let i = match self.state.selected() {
             Some(i) => {
                 if i >= self.processes.len() - 1 {
@@ -67,13 +66,11 @@ impl App {
             }
             None => 0,
         };
-        info!("up i: {}", i);
         self.state.select(Some(i));
         self.scrollbar_state = self.scrollbar_state.position(i);
     }
 
     pub fn previous(&mut self) {
-        info!("previous: len: {}.", self.processes.len());
         let i = match self.state.selected() {
             Some(i) => {
                 if i == 0 {
@@ -162,14 +159,8 @@ fn handle_events(_terminal: &mut Terminal, app: &mut App) -> Result<ControlFlow<
             use KeyCode::*;
             match key.code {
                 Char('q') | Esc => return Ok(ControlFlow::Break(())),
-                Char('j') | Down => {
-                    info!("Down!");
-                    app.next();
-                }
-                Char('k') | Up => {
-                    info!("Up!");
-                    app.previous();
-                }
+                Char('j') | Down => app.next(),
+                Char('k') | Up => app.previous(),
                 _ => {}
             }
         }
@@ -207,7 +198,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     let header = [
         Cell::new(Line::from("Pid:").alignment(Alignment::Right)),
-        Cell::new("Ppid:"),
+        Cell::new("Program:"),
         Cell::new("Command:"),
         Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
         Cell::new("User:"),
@@ -237,8 +228,8 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
     let widths = [
         Percentage(5),
-        Percentage(5),
-        Percentage(70),
+        Percentage(15),
+        Percentage(60),
         Percentage(5),
         Percentage(5),
         Percentage(5),
