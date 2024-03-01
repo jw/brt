@@ -12,7 +12,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::info;
+use log::{debug, info};
 use procfs::process::Process;
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::Position;
@@ -118,32 +118,24 @@ impl App {
     }
 }
 
-#[allow(dead_code)]
 fn get_current_process() -> Process {
     let me = Process::myself().unwrap();
-    let (virtual_mem, resident_mem) = get_memory(&me);
-    info!(
-        "Current pid {}; uses {}/{} bytes ({:02.2}%).",
-        me.pid,
-        virtual_mem,
-        resident_mem,
-        resident_mem as f64 / virtual_mem as f64 * 100.0
-    );
+    let resident_mem = get_memory(&me);
+    debug!("Current pid {} uses {} bytes.", me.pid, resident_mem);
     me
 }
 
-fn get_memory(process: &Process) -> (u64, u64) {
-    let stat = process.stat().unwrap();
+fn get_memory(process: &Process) -> u64 {
+    let stat = process.statm().unwrap();
     let page_size = procfs::page_size();
-    let virtual_mem = stat.vsize;
-    let resident_mem = stat.rss * page_size;
-    (virtual_mem, resident_mem)
+    stat.resident * page_size
 }
 
 fn main() -> Result<()> {
     logger::initialize_logging();
     initialize_panic_handler();
     info!("{NAME} ({VERSION}) started.");
+    get_current_process();
 
     let _cli = Cli::parse();
 

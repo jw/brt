@@ -1,4 +1,4 @@
-use humansize::{format_size, FormatSizeOptions, DECIMAL};
+use humansize::{format_size, FormatSizeOptions, BINARY};
 use log::warn;
 use procfs::process::{all_processes, Process};
 use ratatui::layout::Alignment;
@@ -35,7 +35,7 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
 
     let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
 
-    let humansize_options: FormatSizeOptions = FormatSizeOptions::from(DECIMAL)
+    let humansize_options: FormatSizeOptions = FormatSizeOptions::from(BINARY)
         .space_after_value(false)
         .decimal_places(1)
         .decimal_zeroes(0);
@@ -50,7 +50,7 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
                 .style(special_style),
         ),
         Cell::new(username),
-        Cell::new(format_size(process.virtual_memory, humansize_options)).style(special_style),
+        Cell::new(format_size(process.resident_memory, humansize_options)).style(special_style),
         Cell::new("n/a".to_string()).style(special_style), // TODO: Get CPU
     ])
 }
@@ -75,7 +75,6 @@ pub struct BrtProcess {
     command: String,
     number_of_threads: i64,
     user: Option<User>,
-    virtual_memory: u64,
     resident_memory: u64,
 }
 
@@ -88,7 +87,6 @@ impl Default for BrtProcess {
             command: "".to_string(),
             number_of_threads: -1,
             user: None,
-            virtual_memory: 0,
             resident_memory: 0,
         }
     }
@@ -136,8 +134,7 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
             }
 
             // memory
-            let (virtual_memory, resident_memory) = crate::get_memory(process);
-            brt_process.virtual_memory = virtual_memory;
+            let resident_memory = crate::get_memory(process);
             brt_process.resident_memory = resident_memory;
         }
         Err(_e) => {
