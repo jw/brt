@@ -81,7 +81,6 @@ impl App {
             }
             None => 0,
         };
-        info!("down i: {}", i);
         self.state.select(Some(i));
         self.scrollbar_state = self.scrollbar_state.position(i);
     }
