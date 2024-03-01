@@ -83,7 +83,7 @@ impl Default for BrtProcess {
 fn create_command(cmdline: &[String]) -> String {
     let mut command = "".to_string();
     for part in cmdline.iter() {
-        command += part;
+        command += format!("{} ", part).as_str();
     }
     command
 }
