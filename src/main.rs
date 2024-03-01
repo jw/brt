@@ -189,10 +189,11 @@ fn ui(frame: &mut Frame, app: &mut App) {
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"))
-        .track_symbol(Some(" "));
+        .track_symbol(Some(" "))
+        .style(Color::White);
 
     let selected_style = Style::default()
-        .bg(Color::Rgb(0x6a, 0x2f, 0x2f))
+        .bg(Color::Rgb(0xd4, 0x54, 0x54))
         .fg(Color::White)
         .add_modifier(Modifier::BOLD);
 
