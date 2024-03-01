@@ -70,6 +70,21 @@ impl App {
         self.scrollbar_state = self.scrollbar_state.position(i);
     }
 
+    pub fn next_page(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.processes.len() - 1 {
+                    0
+                } else {
+                    i + 20
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+    }
+
     pub fn previous(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
@@ -77,6 +92,23 @@ impl App {
                     self.processes.len() - 1
                 } else {
                     i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+    }
+
+    pub fn previous_page(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) =>
+            {
+                #[allow(clippy::absurd_extreme_comparisons)]
+                if i - 20 <= 0 {
+                    self.processes.len() - 1
+                } else {
+                    i - 20
                 }
             }
             None => 0,
@@ -159,7 +191,9 @@ fn handle_events(_terminal: &mut Terminal, app: &mut App) -> Result<ControlFlow<
             match key.code {
                 Char('q') | Esc => return Ok(ControlFlow::Break(())),
                 Char('j') | Down => app.next(),
+                PageDown => app.next_page(),
                 Char('k') | Up => app.previous(),
+                PageUp => app.previous_page(),
                 _ => {}
             }
         }
