@@ -1,3 +1,4 @@
+use humansize::{format_size, FormatSizeOptions, DECIMAL};
 use log::warn;
 use procfs::process::{all_processes, Process};
 use ratatui::layout::Alignment;
@@ -34,6 +35,11 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
 
     let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
 
+    let humansize_options: FormatSizeOptions = FormatSizeOptions::from(DECIMAL)
+        .space_after_value(false)
+        .decimal_places(1)
+        .decimal_zeroes(0);
+
     Row::new([
         Cell::new(Line::from(process.pid.to_string()).alignment(Alignment::Right)),
         Cell::new(process.program.to_string()).style(special_style),
@@ -44,8 +50,8 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
                 .style(special_style),
         ),
         Cell::new(username),
-        Cell::new(process.virtual_memory.to_string()).style(special_style), // TODO: Get percentages
-        Cell::new("n/a".to_string()).style(special_style),                  // TODO: Get CPU
+        Cell::new(format_size(process.virtual_memory, humansize_options)).style(special_style),
+        Cell::new("n/a".to_string()).style(special_style), // TODO: Get CPU
     ])
 }
 
