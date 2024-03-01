@@ -1,6 +1,7 @@
 use log::warn;
 use procfs::process::{all_processes, Process};
 use ratatui::layout::Alignment;
+use ratatui::style::{Color, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row};
 use uzers::{get_user_by_uid, User};
@@ -30,14 +31,21 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
     } else {
         "unknown".to_string()
     };
+
+    let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
+
     Row::new([
         Cell::new(Line::from(process.pid.to_string()).alignment(Alignment::Right)),
-        Cell::new(process.program.to_string()),
+        Cell::new(process.program.to_string()).style(special_style),
         Cell::new(process.command.to_string()),
-        Cell::new(Line::from(process.number_of_threads.to_string()).alignment(Alignment::Right)),
+        Cell::new(
+            Line::from(process.number_of_threads.to_string())
+                .alignment(Alignment::Right)
+                .style(special_style),
+        ),
         Cell::new(username),
-        Cell::new(process.virtual_memory.to_string()), // TODO: Get percentages
-        Cell::new("n/a".to_string()),                  // TODO: Get CPU
+        Cell::new(process.virtual_memory.to_string()).style(special_style), // TODO: Get percentages
+        Cell::new("n/a".to_string()).style(special_style),                  // TODO: Get CPU
     ])
 }
 
