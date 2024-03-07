@@ -14,7 +14,7 @@ use crossterm::{
 };
 use log::{debug, info};
 use procfs::process::Process;
-use procfs::{ticks_per_second, Current, Uptime, WithCurrentSystemInfo};
+use procfs::{ticks_per_second, Current, Uptime};
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::Position;
 use ratatui::widgets::{
@@ -136,14 +136,20 @@ fn get_memory(process: &Process) -> u64 {
 
 fn get_cpu(process: &Process) -> f64 {
     let stat = process.stat().unwrap();
-    info!("{}: starttime: {}", process.pid, stat.starttime);
-    info!("utime: {}", (stat.utime / ticks_per_second()) as f64);
-    info!("stime: {}", stat.stime / ticks_per_second());
-    info!("u+s: {}", (stat.utime + stat.stime) / ticks_per_second());
 
-    info!("Uptime: {:?}", Uptime::current().unwrap().uptime_duration());
-    info!("rss_bytes: {}", stat.rss_bytes().get());
-    0.0
+    let usage = stat.utime / ticks_per_second() + stat.stime / ticks_per_second();
+    debug!("usage: {}s", usage);
+
+    let uptime = Uptime::current().unwrap().uptime_duration().as_secs();
+    debug!("Uptime: {}s", uptime);
+
+    let starttime = stat.starttime / ticks_per_second();
+    debug!("Starttime: {}s", starttime);
+
+    let runtime = uptime - starttime;
+    debug!("runtime: {}s", runtime);
+
+    usage as f64 * 100.0 / runtime as f64
 }
 
 fn main() -> Result<()> {
