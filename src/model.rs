@@ -76,6 +76,7 @@ pub struct BrtProcess {
     number_of_threads: i64,
     user: Option<User>,
     resident_memory: u64,
+    cpu: f64,
 }
 
 impl Default for BrtProcess {
@@ -88,6 +89,7 @@ impl Default for BrtProcess {
             number_of_threads: -1,
             user: None,
             resident_memory: 0,
+            cpu: 0.0,
         }
     }
 }
@@ -136,6 +138,10 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
             // memory
             let resident_memory = crate::get_memory(process);
             brt_process.resident_memory = resident_memory;
+
+            // cpu
+            let cpu = crate::get_cpu(process);
+            brt_process.cpu = cpu
         }
         Err(_e) => {
             warn!("Stat not found for process {}.", process.pid().to_string());

@@ -14,6 +14,7 @@ use crossterm::{
 };
 use log::{debug, info};
 use procfs::process::Process;
+use procfs::{ticks_per_second, Current, Uptime, WithCurrentSystemInfo};
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::Position;
 use ratatui::widgets::{
@@ -26,6 +27,7 @@ use ratatui::{
 
 mod logger;
 mod model;
+mod processbar;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -118,6 +120,7 @@ impl App {
     }
 }
 
+#[allow(dead_code)]
 fn get_current_process() -> Process {
     let me = Process::myself().unwrap();
     let resident_mem = get_memory(&me);
@@ -126,16 +129,28 @@ fn get_current_process() -> Process {
 }
 
 fn get_memory(process: &Process) -> u64 {
-    let stat = process.statm().unwrap();
+    let statm = process.statm().unwrap();
     let page_size = procfs::page_size();
-    stat.resident * page_size
+    statm.resident * page_size
+}
+
+fn get_cpu(process: &Process) -> f64 {
+    let stat = process.stat().unwrap();
+    info!("{}: starttime: {}", process.pid, stat.starttime);
+    info!("utime: {}", (stat.utime / ticks_per_second()) as f64);
+    info!("stime: {}", stat.stime / ticks_per_second());
+    info!("u+s: {}", (stat.utime + stat.stime) / ticks_per_second());
+
+    info!("Uptime: {:?}", Uptime::current().unwrap().uptime_duration());
+    info!("rss_bytes: {}", stat.rss_bytes().get());
+    0.0
 }
 
 fn main() -> Result<()> {
     logger::initialize_logging();
     initialize_panic_handler();
+
     info!("{NAME} ({VERSION}) started.");
-    get_current_process();
 
     let _cli = Cli::parse();
 

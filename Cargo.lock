@@ -152,6 +152,7 @@ dependencies = [
  "log",
  "log4rs",
  "nix 0.28.0",
+ "owo-colors",
  "procfs",
  "ratatui",
  "uzers",
@@ -707,6 +708,12 @@ checksum = "68f19d67e5a2795c94e73e0bb1cc1a7edeb2e28efd39e2e1c9b7a40c1108b11c"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "owo-colors"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caff54706df99d2a78a5a4e3455ff45448d81ef1bb63c22cd14052ca0e993a3f"
 
 [[package]]
 name = "parking_lot"
