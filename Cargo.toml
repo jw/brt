@@ -13,6 +13,9 @@ rust-version = "1.74.1"
 [[bin]]
 name = "brt"
 
+[[bin]]
+name = "processbar"
+path = "src/processbar.rs"
 
 [dependencies]
 crossterm = "0.27.0"
@@ -29,6 +32,7 @@ procfs = "0.16.0"
 uzers = "0.11.3"
 nix = "0.28.0"
 humansize = "2.1.3"
+owo-colors = "4.0.0"
 
 
 [dev-dependencies.cargo-husky]

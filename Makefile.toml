@@ -36,6 +36,8 @@ toolchain = "nightly"
 command = "cargo"
 args = [
     "rustdoc",
+    "--bin",
+    "brt",
     "--no-default-features",
     "--",
     "-Zunstable-options",
