@@ -33,9 +33,9 @@ fn main() -> Result<()> {
     debug!("Starttime: {}", starttime);
     let runtime = uptime - starttime;
     debug!("runtime: {}", runtime);
-    let percentage = usage * 100 / runtime;
+    let percentage = usage as f64 * 100.0 / runtime as f64;
     println!(
-        "{} ({}) has used {}% of the cpu.",
+        "{} ({}) has used {:.2}% of the cpu.",
         stat.comm.green(),
         pid.yellow(),
         percentage.red(),
