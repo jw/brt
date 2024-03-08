@@ -14,7 +14,7 @@ use crossterm::{
 };
 use log::{debug, info};
 use procfs::process::Process;
-use procfs::{ticks_per_second, Current, Uptime};
+use procfs::{ticks_per_second, CpuInfo, Current, Uptime};
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::Position;
 use ratatui::widgets::{
@@ -149,7 +149,10 @@ fn get_cpu(process: &Process) -> f64 {
     let runtime = uptime - starttime;
     debug!("runtime: {}s", runtime);
 
-    usage as f64 * 100.0 / runtime as f64
+    let num_cores = CpuInfo::current().unwrap().num_cores();
+    debug!("Uptime: {}s", uptime);
+
+    usage as f64 * 100.0 / runtime as f64 / num_cores as f64
 }
 
 fn main() -> Result<()> {
