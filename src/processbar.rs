@@ -3,7 +3,7 @@ use clap::Parser;
 use log::debug;
 use owo_colors::OwoColorize;
 use procfs::process::Process;
-use procfs::{page_size, ticks_per_second, Current, Uptime};
+use procfs::{page_size, ticks_per_second, CpuInfo, Current, Uptime};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -33,7 +33,9 @@ fn main() -> Result<()> {
     debug!("Starttime: {}", starttime);
     let runtime = uptime - starttime;
     debug!("runtime: {}", runtime);
-    let percentage = usage as f64 * 100.0 / runtime as f64;
+    let num_cores = CpuInfo::current().unwrap().num_cores();
+    debug!("num cores: {}", num_cores);
+    let percentage = usage as f64 * 100.0 / runtime as f64 / num_cores as f64;
     println!(
         "{} ({}) has used {:.2}% of the cpu.",
         stat.comm.green(),
