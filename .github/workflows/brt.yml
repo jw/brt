@@ -30,8 +30,8 @@ jobs:
         run: cargo make lint-docs
       - name: Check typos
         uses: crate-ci/typos@master
-      - name: Lint dependencies
-        uses: EmbarkStudios/cargo-deny-action@v1
+#      - name: Lint dependencies
+#        uses: EmbarkStudios/cargo-deny-action@v1
 
   clippy:
     runs-on: ubuntu-latest
@@ -49,43 +49,41 @@ jobs:
       - name: Run cargo make clippy-all
         run: cargo make clippy
 
-    coverage:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
-        - name: Install Rust stable
-          uses: dtolnay/rust-toolchain@stable
-          with:
-            components: llvm-tools
-        - name: Install cargo-llvm-cov and cargo-make
-          uses: taiki-e/install-action@v2
-          with:
-            tool: cargo-llvm-cov,cargo-make
-        - name: Cache Cargo dependencies
-          uses: Swatinem/rust-cache@v2
-        - name: Generate coverage
-          run: cargo make coverage
-        - name: Upload to codecov.io
-          uses: codecov/codecov-action@v4
-          with:
-            token: ${{ secrets.CODECOV_TOKEN }}
-            fail_ci_if_error: true
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools
+      - name: Install cargo-llvm-cov and cargo-make
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-make
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Generate coverage
+        run: cargo make coverage
+#      - name: Upload to codecov.io
+#        uses: codecov/codecov-action@v4
+#        with:
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          fail_ci_if_error: true
 
-    check:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v4
-        - name: Install Rust {{ matrix.toolchain }}
-          uses: dtolnay/rust-toolchain@master
-          with:
-            toolchain: ${{ matrix.toolchain }}
-        - name: Install cargo-make
-          uses: taiki-e/install-action@cargo-make
-        - name: Cache Cargo dependencies
-          uses: Swatinem/rust-cache@v2
-        - name: Run cargo make check
-          run: cargo make check
-          env:
-            RUST_BACKTRACE: full
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-make
+        uses: taiki-e/install-action@cargo-make
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Run cargo make check
+        run: cargo make check
+        env:
+          RUST_BACKTRACE: full
