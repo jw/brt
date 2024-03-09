@@ -66,11 +66,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Generate coverage
         run: cargo make coverage
-      - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+#      - name: Upload to codecov.io
+#        uses: codecov/codecov-action@v4
+#        with:
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          fail_ci_if_error: true
 
   check:
     runs-on: ubuntu-latest
