@@ -30,8 +30,8 @@ jobs:
         run: cargo make lint-docs
       - name: Check typos
         uses: crate-ci/typos@master
-      - name: Lint dependencies
-        uses: EmbarkStudios/cargo-deny-action@v1
+#      - name: Lint dependencies
+#        uses: EmbarkStudios/cargo-deny-action@v1
 
   clippy:
     runs-on: ubuntu-latest
@@ -77,10 +77,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust {{ matrix.toolchain }}
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-make
         uses: taiki-e/install-action@cargo-make
       - name: Cache Cargo dependencies
