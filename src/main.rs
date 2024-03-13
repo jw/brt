@@ -1,314 +1,363 @@
-use std::{
-    error::Error,
-    io::{stdout, Stdout},
-    ops::ControlFlow,
-    time::Duration,
-};
+pub mod action;
+pub mod app;
+pub mod cli;
+pub mod components;
+pub mod config;
+pub mod tui;
+pub mod utils;
 
-use crate::model::BrtProcess;
 use clap::Parser;
-use crossterm::{
-    event::{self, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use log::{debug, info};
-use procfs::process::Process;
-use procfs::{ticks_per_second, CpuInfo, Current, Uptime};
-use ratatui::layout::Constraint::Percentage;
-use ratatui::widgets::block::Position;
-use ratatui::widgets::{
-    Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
-};
-use ratatui::{
-    prelude::*,
-    widgets::{block::Title, Block, BorderType, Borders},
+use cli::Cli;
+use color_eyre::eyre::Result;
+
+use crate::{
+    app::App,
+    utils::{initialize_logging, initialize_panic_handler},
 };
 
-mod logger;
-mod model;
-mod processbar;
+// use std::{
+//     error::Error,
+//     io::{stdout, Stdout},
+//     ops::ControlFlow,
+//     time::Duration,
+// };
+//
+// use crate::model::BrtProcess;
+// use clap::Parser;
+// use crossterm::{
+//     event::{self, Event, KeyCode},
+//     execute,
+//     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+// };
+// use log::{debug, info};
+// use procfs::process::Process;
+// use procfs::{ticks_per_second, CpuInfo, Current, Uptime};
+// use ratatui::layout::Constraint::Percentage;
+// use ratatui::widgets::block::Position;
+// use ratatui::widgets::{
+//     Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
+// };
+// use ratatui::{
+//     prelude::*,
+//     widgets::{block::Title, Block, BorderType, Borders},
+// };
+//
+// mod logger;
+// mod model;
+// mod processbar;
+// mod utils;
 
-const NAME: &str = env!("CARGO_PKG_NAME");
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+// const NAME: &str = env!("CARGO_PKG_NAME");
+// const VERSION: &str = env!("CARGO_PKG_VERSION");
+//
+// // These type aliases are used to make the code more readable by reducing repetition of the generic
+// // types. They are not necessary for the functionality of the code.
+// type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
+// type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-// These type aliases are used to make the code more readable by reducing repetition of the generic
-// types. They are not necessary for the functionality of the code.
-type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
+// #[derive(Parser)]
+// #[command(version, about, long_about = None)]
+// struct Cli {}
+//
+// struct App {
+//     state: TableState,
+//     processes: Vec<BrtProcess>,
+//     scrollbar_state: ScrollbarState,
+// }
 
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Cli {}
+// impl App {
+//     fn new() -> App {
+//         let processes = model::get_processes(model::get_all_processes());
+//         App {
+//             state: TableState::default().with_selected(0),
+//             scrollbar_state: ScrollbarState::new(processes.len() - 1),
+//             processes,
+//         }
+//     }
+//
+//     pub fn next(&mut self) {
+//         let i = match self.state.selected() {
+//             Some(i) => {
+//                 if i >= self.processes.len() - 1 {
+//                     0
+//                 } else {
+//                     i + 1
+//                 }
+//             }
+//             None => 0,
+//         };
+//         self.state.select(Some(i));
+//         self.scrollbar_state = self.scrollbar_state.position(i);
+//     }
+//
+//     pub fn next_page(&mut self) {
+//         let i = match self.state.selected() {
+//             Some(i) => {
+//                 if i >= self.processes.len() - 1 {
+//                     0
+//                 } else {
+//                     i + 20
+//                 }
+//             }
+//             None => 0,
+//         };
+//         self.state.select(Some(i));
+//         self.scrollbar_state = self.scrollbar_state.position(i);
+//     }
+//
+//     pub fn previous(&mut self) {
+//         let i = match self.state.selected() {
+//             Some(i) => {
+//                 if i == 0 {
+//                     self.processes.len() - 1
+//                 } else {
+//                     i - 1
+//                 }
+//             }
+//             None => 0,
+//         };
+//         self.state.select(Some(i));
+//         self.scrollbar_state = self.scrollbar_state.position(i);
+//     }
+//
+//     pub fn previous_page(&mut self) {
+//         let i = match self.state.selected() {
+//             Some(i) =>
+//             {
+//                 #[allow(clippy::absurd_extreme_comparisons)]
+//                 if i - 20 <= 0 {
+//                     self.processes.len() - 1
+//                 } else {
+//                     i - 20
+//                 }
+//             }
+//             None => 0,
+//         };
+//         self.state.select(Some(i));
+//         self.scrollbar_state = self.scrollbar_state.position(i);
+//     }
+// }
 
-struct App {
-    state: TableState,
-    processes: Vec<BrtProcess>,
-    scrollbar_state: ScrollbarState,
-}
+// #[allow(dead_code)]
+// fn get_current_process() -> Process {
+//     let me = Process::myself().unwrap();
+//     let resident_mem = get_memory(&me);
+//     debug!("Current pid {} uses {} bytes.", me.pid, resident_mem);
+//     me
+// }
 
-impl App {
-    fn new() -> App {
-        let processes = model::get_processes(model::get_all_processes());
-        App {
-            state: TableState::default().with_selected(0),
-            scrollbar_state: ScrollbarState::new(processes.len() - 1),
-            processes,
-        }
-    }
+// fn get_memory(process: &Process) -> u64 {
+//     let statm = process.statm().unwrap();
+//     let page_size = procfs::page_size();
+//     statm.resident * page_size
+// }
 
-    pub fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.processes.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-    }
+// fn get_cpu(process: &Process) -> f64 {
+//     let stat = process.stat().unwrap();
+//
+//     let usage = stat.utime / ticks_per_second() + stat.stime / ticks_per_second();
+//     debug!("usage: {}s", usage);
+//
+//     let uptime = Uptime::current().unwrap().uptime_duration().as_secs();
+//     debug!("Uptime: {}s", uptime);
+//
+//     let starttime = stat.starttime / ticks_per_second();
+//     debug!("Starttime: {}s", starttime);
+//
+//     let runtime = uptime - starttime;
+//     debug!("runtime: {}s", runtime);
+//
+//     let num_cores = CpuInfo::current().unwrap().num_cores();
+//     debug!("Uptime: {}s", uptime);
+//
+//     usage as f64 * 100.0 / runtime as f64 / num_cores as f64
+// }
 
-    pub fn next_page(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.processes.len() - 1 {
-                    0
-                } else {
-                    i + 20
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-    }
+// fn main() -> Result<()> {
+//     logger::initialize_logging();
+//     initialize_panic_handler();
+//
+//     info!("{NAME} ({VERSION}) started.");
+//
+//     let _cli = Cli::parse();
+//
+//     let mut terminal = setup_terminal()?;
+//
+//     let app = App::new();
+//
+//     let result = run(&mut terminal, app);
+//     restore_terminal(terminal)?;
+//
+//     if let Err(err) = result {
+//         eprintln!("{err:?}");
+//     }
+//     Ok(())
+// }
 
-    pub fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.processes.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-    }
+// use clap::Parser;
+// use cli::Cli;
+// use color_eyre::eyre::Result;
 
-    pub fn previous_page(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) =>
-            {
-                #[allow(clippy::absurd_extreme_comparisons)]
-                if i - 20 <= 0 {
-                    self.processes.len() - 1
-                } else {
-                    i - 20
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-    }
-}
+// use crate::{
+//     app::App,
+//     utils::{initialize_logging, initialize_panic_handler, version},
+// };
 
-#[allow(dead_code)]
-fn get_current_process() -> Process {
-    let me = Process::myself().unwrap();
-    let resident_mem = get_memory(&me);
-    debug!("Current pid {} uses {} bytes.", me.pid, resident_mem);
-    me
-}
+async fn tokio_main() -> Result<()> {
+    initialize_logging()?;
 
-fn get_memory(process: &Process) -> u64 {
-    let statm = process.statm().unwrap();
-    let page_size = procfs::page_size();
-    statm.resident * page_size
-}
+    initialize_panic_handler()?;
 
-fn get_cpu(process: &Process) -> f64 {
-    let stat = process.stat().unwrap();
+    let args = Cli::parse();
+    let mut app = App::new(args.tick_rate, args.frame_rate)?;
+    app.run().await?;
 
-    let usage = stat.utime / ticks_per_second() + stat.stime / ticks_per_second();
-    debug!("usage: {}s", usage);
-
-    let uptime = Uptime::current().unwrap().uptime_duration().as_secs();
-    debug!("Uptime: {}s", uptime);
-
-    let starttime = stat.starttime / ticks_per_second();
-    debug!("Starttime: {}s", starttime);
-
-    let runtime = uptime - starttime;
-    debug!("runtime: {}s", runtime);
-
-    let num_cores = CpuInfo::current().unwrap().num_cores();
-    debug!("Uptime: {}s", uptime);
-
-    usage as f64 * 100.0 / runtime as f64 / num_cores as f64
-}
-
-fn main() -> Result<()> {
-    logger::initialize_logging();
-    initialize_panic_handler();
-
-    info!("{NAME} ({VERSION}) started.");
-
-    let _cli = Cli::parse();
-
-    let mut terminal = setup_terminal()?;
-
-    let app = App::new();
-
-    let result = run(&mut terminal, app);
-    restore_terminal(terminal)?;
-
-    if let Err(err) = result {
-        eprintln!("{err:?}");
-    }
     Ok(())
 }
 
-fn setup_terminal() -> Result<Terminal> {
-    enable_raw_mode()?;
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
-}
-
-fn restore_terminal(mut terminal: Terminal) -> Result<()> {
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    Ok(())
-}
-
-fn run(terminal: &mut Terminal, mut app: App) -> Result<()> {
-    loop {
-        terminal.draw(|f| ui(f, &mut app))?;
-        if handle_events(terminal, &mut app)?.is_break() {
-            return Ok(());
-        }
+#[tokio::main]
+async fn main() -> Result<()> {
+    if let Err(e) = tokio_main().await {
+        eprintln!("{} error: Something went wrong", env!("CARGO_PKG_NAME"));
+        Err(e)
+    } else {
+        Ok(())
     }
 }
 
-fn handle_events(_terminal: &mut Terminal, app: &mut App) -> Result<ControlFlow<()>> {
-    if event::poll(Duration::from_millis(200))? {
-        if let Event::Key(key) = event::read()? {
-            use KeyCode::*;
-            match key.code {
-                Char('q') | Esc => return Ok(ControlFlow::Break(())),
-                Char('j') | Down => app.next(),
-                PageDown => app.next_page(),
-                Char('k') | Up => app.previous(),
-                PageUp => app.previous_page(),
-                _ => {}
-            }
-        }
-    }
-    Ok(ControlFlow::Continue(()))
-}
-
-pub fn initialize_panic_handler() {
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic_info| {
-        crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen).unwrap();
-        crossterm::terminal::disable_raw_mode().unwrap();
-        original_hook(panic_info);
-    }));
-}
-
-fn ui(frame: &mut Frame, app: &mut App) {
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Percentage(100)])
-        .split(frame.size());
-
-    // info!("Battery state is {}.", model::get_battery());
-    let rows = model::create_rows(&app.processes);
-
-    let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-        .begin_symbol(Some("↑"))
-        .end_symbol(Some("↓"))
-        .track_symbol(Some(" "))
-        .style(Color::White);
-
-    let selected_style = Style::default()
-        .bg(Color::Rgb(0xd4, 0x54, 0x54))
-        .fg(Color::White)
-        .add_modifier(Modifier::BOLD);
-
-    let header = [
-        Cell::new(Line::from("Pid:").alignment(Alignment::Right)),
-        Cell::new("Program:"),
-        Cell::new("Command:"),
-        Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
-        Cell::new("User:"),
-        Cell::new("MemB"),
-        Cell::new("Cpu%"),
-    ]
-    .iter()
-    .cloned()
-    .map(Cell::from)
-    .collect::<Row>()
-    .height(1)
-    .style(Style::default().bold());
-
-    let processes = app.processes.len();
-    let process = format!("{}/{}", app.state.selected().unwrap() + 1, processes);
-
-    let block = Block::default()
-        .title(Title::from("brt").alignment(Alignment::Center))
-        .title(
-            Title::from(process)
-                .position(Position::Bottom)
-                .alignment(Alignment::Right),
-        )
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::White))
-        .border_type(BorderType::Rounded);
-
-    let widths = [
-        Percentage(5),
-        Percentage(15),
-        Percentage(60),
-        Percentage(5),
-        Percentage(5),
-        Percentage(5),
-        Percentage(5),
-    ];
-
-    let table = Table::new(rows, widths)
-        .block(block)
-        .header(header)
-        .highlight_style(selected_style);
-
-    frame.render_stateful_widget(table, layout[0], &mut app.state);
-    frame.render_stateful_widget(
-        scrollbar,
-        layout[0].inner(&Margin {
-            vertical: 1,
-            horizontal: 1,
-        }),
-        &mut app.scrollbar_state,
-    );
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::Cli;
-
-    #[test]
-    fn verify_cli() {
-        use clap::CommandFactory;
-        Cli::command().debug_assert()
-    }
-}
+// fn setup_terminal() -> Result<Terminal> {
+//     enable_raw_mode()?;
+//     let mut stdout = stdout();
+//     execute!(stdout, EnterAlternateScreen)?;
+//     let backend = CrosstermBackend::new(stdout);
+//     let terminal = Terminal::new(backend)?;
+//     Ok(terminal)
+// }
+//
+// fn restore_terminal(mut terminal: Terminal) -> Result<()> {
+//     disable_raw_mode()?;
+//     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+//     Ok(())
+// }
+//
+// fn run(terminal: &mut Terminal, mut app: App) -> Result<()> {
+//     loop {
+//         terminal.draw(|f| ui(f, &mut app))?;
+//         if handle_events(terminal, &mut app)?.is_break() {
+//             return Ok(());
+//         }
+//     }
+// }
+//
+// fn handle_events(_terminal: &mut Terminal, app: &mut App) -> Result<ControlFlow<()>> {
+//     if event::poll(Duration::from_millis(200))? {
+//         if let Event::Key(key) = event::read()? {
+//             use KeyCode::*;
+//             match key.code {
+//                 Char('q') | Esc => return Ok(ControlFlow::Break(())),
+//                 Char('j') | Down => app.next(),
+//                 PageDown => app.next_page(),
+//                 Char('k') | Up => app.previous(),
+//                 PageUp => app.previous_page(),
+//                 _ => {}
+//             }
+//         }
+//     }
+//     Ok(ControlFlow::Continue(()))
+// }
+//
+// pub fn initialize_panic_handler() {
+//     let original_hook = std::panic::take_hook();
+//     std::panic::set_hook(Box::new(move |panic_info| {
+//         crossterm::execute!(std::io::stderr(), crossterm::terminal::LeaveAlternateScreen).unwrap();
+//         crossterm::terminal::disable_raw_mode().unwrap();
+//         original_hook(panic_info);
+//     }));
+// }
+//
+// fn ui(frame: &mut Frame, app: &mut App) {
+//     let layout = Layout::default()
+//         .direction(Direction::Vertical)
+//         .constraints([Percentage(100)])
+//         .split(frame.size());
+//
+//     // info!("Battery state is {}.", model::get_battery());
+//     let rows = model::create_rows(&app.processes);
+//
+//     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+//         .begin_symbol(Some("↑"))
+//         .end_symbol(Some("↓"))
+//         .track_symbol(Some(" "))
+//         .style(Color::White);
+//
+//     let selected_style = Style::default()
+//         .bg(Color::Rgb(0xd4, 0x54, 0x54))
+//         .fg(Color::White)
+//         .add_modifier(Modifier::BOLD);
+//
+//     let header = [
+//         Cell::new(Line::from("Pid:").alignment(Alignment::Right)),
+//         Cell::new("Program:"),
+//         Cell::new("Command:"),
+//         Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
+//         Cell::new("User:"),
+//         Cell::new("MemB"),
+//         Cell::new("Cpu%"),
+//     ]
+//     .iter()
+//     .cloned()
+//     .map(Cell::from)
+//     .collect::<Row>()
+//     .height(1)
+//     .style(Style::default().bold());
+//
+//     let processes = app.processes.len();
+//     let process = format!("{}/{}", app.state.selected().unwrap() + 1, processes);
+//
+//     let block = Block::default()
+//         .title(Title::from("brt").alignment(Alignment::Center))
+//         .title(
+//             Title::from(process)
+//                 .position(Position::Bottom)
+//                 .alignment(Alignment::Right),
+//         )
+//         .borders(Borders::ALL)
+//         .border_style(Style::default().fg(Color::White))
+//         .border_type(BorderType::Rounded);
+//
+//     let widths = [
+//         Percentage(5),
+//         Percentage(15),
+//         Percentage(60),
+//         Percentage(5),
+//         Percentage(5),
+//         Percentage(5),
+//         Percentage(5),
+//     ];
+//
+//     let table = Table::new(rows, widths)
+//         .block(block)
+//         .header(header)
+//         .highlight_style(selected_style);
+//
+//     frame.render_stateful_widget(table, layout[0], &mut app.state);
+//     frame.render_stateful_widget(
+//         scrollbar,
+//         layout[0].inner(&Margin {
+//             vertical: 1,
+//             horizontal: 1,
+//         }),
+//         &mut app.scrollbar_state,
+//     );
+// }
+//
+// #[cfg(test)]
+// mod tests {
+//     use crate::Cli;
+//
+//     #[test]
+//     fn verify_cli() {
+//         use clap::CommandFactory;
+//         Cli::command().debug_assert()
+//     }
+// }

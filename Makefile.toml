@@ -1,6 +1,6 @@
 
 [env]
-FEATURES = ""
+BRT_GIT_INFO = "template"
 
 [tasks.default]
 alias = "ci"
