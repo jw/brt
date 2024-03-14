@@ -11,6 +11,7 @@ use crate::{
 
 pub mod fps;
 pub mod home;
+pub mod model;
 
 pub trait Component {
     #[allow(unused_variables)]
