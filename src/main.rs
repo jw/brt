@@ -152,27 +152,6 @@ use crate::{
 //     statm.resident * page_size
 // }
 
-// fn get_cpu(process: &Process) -> f64 {
-//     let stat = process.stat().unwrap();
-//
-//     let usage = stat.utime / ticks_per_second() + stat.stime / ticks_per_second();
-//     debug!("usage: {}s", usage);
-//
-//     let uptime = Uptime::current().unwrap().uptime_duration().as_secs();
-//     debug!("Uptime: {}s", uptime);
-//
-//     let starttime = stat.starttime / ticks_per_second();
-//     debug!("Starttime: {}s", starttime);
-//
-//     let runtime = uptime - starttime;
-//     debug!("runtime: {}s", runtime);
-//
-//     let num_cores = CpuInfo::current().unwrap().num_cores();
-//     debug!("Uptime: {}s", uptime);
-//
-//     usage as f64 * 100.0 / runtime as f64 / num_cores as f64
-// }
-
 // fn main() -> Result<()> {
 //     logger::initialize_logging();
 //     initialize_panic_handler();
@@ -360,4 +339,7 @@ async fn main() -> Result<()> {
 //         use clap::CommandFactory;
 //         Cli::command().debug_assert()
 //     }
+// }
+// pub(crate) fn get_cpu(_process: &Process) -> f64 {
+//     42.0
 // }

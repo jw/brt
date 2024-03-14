@@ -1,6 +1,7 @@
 use humansize::{format_size, FormatSizeOptions, BINARY};
-use log::warn;
+use log::{debug, warn};
 use procfs::process::{all_processes, Process};
+use procfs::{ticks_per_second, CpuInfo, Current, Uptime};
 use ratatui::layout::Alignment;
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
@@ -55,10 +56,10 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
     ])
 }
 
-pub fn get_processes(all_processes: Vec<Process>) -> Vec<BrtProcess> {
+pub fn get_processes(all_processes: &Vec<Process>) -> Vec<BrtProcess> {
     let mut processes = Vec::new();
     for process in all_processes {
-        let cells = match create_process(&process) {
+        let cells = match create_process(process) {
             Some(value) => value,
             None => continue,
         };
@@ -136,11 +137,11 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
             }
 
             // memory
-            let resident_memory = crate::get_memory(process);
+            let resident_memory = get_memory(process);
             brt_process.resident_memory = resident_memory;
 
             // cpu
-            let cpu = crate::get_cpu(process);
+            let cpu = get_cpu(process);
             brt_process.cpu = cpu
         }
         Err(_e) => {
@@ -149,6 +150,33 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
         }
     }
     Some(brt_process)
+}
+
+fn get_memory(process: &Process) -> u64 {
+    let statm = process.statm().unwrap();
+    let page_size = procfs::page_size();
+    statm.resident * page_size
+}
+
+fn get_cpu(process: &Process) -> f64 {
+    let stat = process.stat().unwrap();
+
+    let usage = stat.utime / ticks_per_second() + stat.stime / ticks_per_second();
+    debug!("usage: {}s", usage);
+
+    let uptime = Uptime::current().unwrap().uptime_duration().as_secs();
+    debug!("Uptime: {}s", uptime);
+
+    let starttime = stat.starttime / ticks_per_second();
+    debug!("Starttime: {}s", starttime);
+
+    let runtime = uptime - starttime;
+    debug!("runtime: {}s", runtime);
+
+    let num_cores = CpuInfo::current().unwrap().num_cores();
+    debug!("Uptime: {}s", uptime);
+
+    usage as f64 * 100.0 / runtime as f64 / num_cores as f64
 }
 
 pub fn get_all_processes() -> Vec<Process> {
