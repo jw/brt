@@ -22,7 +22,7 @@ pub enum Mode {
     Processing,
 }
 
-pub struct Home {
+pub struct Process {
     pub show_help: bool,
     pub app_ticker: usize,
     pub render_ticker: usize,
@@ -36,11 +36,11 @@ pub struct Home {
     pub last_events: Vec<KeyEvent>,
 }
 
-impl Default for Home {
-    fn default() -> Home {
+impl Default for Process {
+    fn default() -> Process {
         let processes = Self::foo_processes();
         let length = processes.len();
-        Home {
+        Process {
             show_help: false,
             app_ticker: 0,
             render_ticker: 0,
@@ -56,7 +56,7 @@ impl Default for Home {
     }
 }
 
-impl Home {
+impl Process {
     pub fn new() -> Self {
         Self::default()
     }
@@ -144,7 +144,7 @@ impl Home {
     }
 }
 
-impl Component for Home {
+impl Component for Process {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx);
         Ok(())
