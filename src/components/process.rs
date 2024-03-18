@@ -38,7 +38,7 @@ pub struct Process {
 
 impl Default for Process {
     fn default() -> Process {
-        let processes = Self::foo_processes();
+        let processes = Self::get_processes();
         let length = processes.len();
         Process {
             show_help: false,
@@ -47,7 +47,7 @@ impl Default for Process {
             mode: Default::default(),
             input: Default::default(),
             processes,
-            scrollbar_state: Self::foo_scrollbar_state(length),
+            scrollbar_state: Self::get_scrollbar_state(length),
             state: TableState::new().with_selected(Some(0)),
             action_tx: None,
             keymap: Default::default(),
@@ -71,14 +71,14 @@ impl Process {
         self.last_events.drain(..);
     }
 
-    pub fn foo_processes() -> Vec<BrtProcess> {
+    pub fn get_processes() -> Vec<BrtProcess> {
         let processes = model::get_all_processes();
         let processes = model::get_processes(&processes);
         info!("Found {} processes.", processes.len());
         processes
     }
 
-    pub fn foo_scrollbar_state(length: usize) -> ScrollbarState {
+    pub fn get_scrollbar_state(length: usize) -> ScrollbarState {
         let scrollbar_state = ScrollbarState::new(length);
         info!("State: {:?}", scrollbar_state);
         scrollbar_state
