@@ -1,6 +1,6 @@
 {
   "keybindings": {
-    "Home": {
+    "Process": {
       "<q>": "Quit", // Quit the application
       "<j>": "ScheduleIncrement",
       "<k>": "ScheduleDecrement",
