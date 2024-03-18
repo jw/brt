@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use log::{debug, error, info};
 use ratatui::layout::Constraint::Percentage;
-use ratatui::widgets::block::Title;
+use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::TableState;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
@@ -48,7 +48,7 @@ impl Default for Process {
             input: Default::default(),
             processes,
             scrollbar_state: Self::foo_scrollbar_state(length),
-            state: Default::default(),
+            state: TableState::new().with_selected(Some(0)),
             action_tx: None,
             keymap: Default::default(),
             last_events: vec![],
@@ -247,8 +247,16 @@ impl Component for Process {
         .height(1)
         .style(Style::default().bold());
 
+        let processes = self.processes.len();
+        let process = format!("{}/{}", self.state.selected().unwrap() + 1, processes);
+
         let block = Block::default()
             .title(Title::from("brt").alignment(Alignment::Center))
+            .title(
+                Title::from(process)
+                    .position(Position::Bottom)
+                    .alignment(Alignment::Right),
+            )
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::White))
             .border_type(BorderType::Rounded);
