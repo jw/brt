@@ -79,9 +79,7 @@ impl Process {
     }
 
     pub fn get_scrollbar_state(length: usize) -> ScrollbarState {
-        let scrollbar_state = ScrollbarState::new(length);
-        info!("State: {:?}", scrollbar_state);
-        scrollbar_state
+        ScrollbarState::new(length)
     }
 
     pub fn render_tick(&mut self) {
