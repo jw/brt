@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use log::error;
+use log::{debug, error, info};
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::Title;
 use ratatui::widgets::TableState;
@@ -12,6 +12,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use super::{model, Component, Frame};
 use crate::action::Action;
+use crate::components::model::BrtProcess;
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub enum Mode {
@@ -21,16 +22,38 @@ pub enum Mode {
     Processing,
 }
 
-#[derive(Default)]
 pub struct Home {
     pub show_help: bool,
     pub app_ticker: usize,
     pub render_ticker: usize,
     pub mode: Mode,
     pub input: Input,
+    pub processes: Vec<BrtProcess>,
+    pub scrollbar_state: ScrollbarState,
+    pub state: TableState,
     pub action_tx: Option<UnboundedSender<Action>>,
     pub keymap: HashMap<KeyEvent, Action>,
     pub last_events: Vec<KeyEvent>,
+}
+
+impl Default for Home {
+    fn default() -> Home {
+        let processes = Self::foo_processes();
+        let length = processes.len();
+        Home {
+            show_help: false,
+            app_ticker: 0,
+            render_ticker: 0,
+            mode: Default::default(),
+            input: Default::default(),
+            processes,
+            scrollbar_state: Self::foo_scrollbar_state(length),
+            state: Default::default(),
+            action_tx: None,
+            keymap: Default::default(),
+            last_events: vec![],
+        }
+    }
 }
 
 impl Home {
@@ -44,9 +67,21 @@ impl Home {
     }
 
     pub fn tick(&mut self) {
-        log::info!("Tick");
         self.app_ticker = self.app_ticker.saturating_add(1);
         self.last_events.drain(..);
+    }
+
+    pub fn foo_processes() -> Vec<BrtProcess> {
+        let processes = model::get_all_processes();
+        let processes = model::get_processes(&processes);
+        info!("Found {} processes.", processes.len());
+        processes
+    }
+
+    pub fn foo_scrollbar_state(length: usize) -> ScrollbarState {
+        let scrollbar_state = ScrollbarState::new(length);
+        info!("State: {:?}", scrollbar_state);
+        scrollbar_state
     }
 
     pub fn render_tick(&mut self) {
@@ -73,6 +108,40 @@ impl Home {
             tx.send(Action::ExitProcessing).unwrap();
         });
     }
+
+    pub fn up(&mut self, s: usize) {
+        info!("Up {}", s);
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.processes.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+        info!("Up to {}", i)
+    }
+
+    pub fn down(&mut self, s: usize) {
+        info!("Down {}", s);
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.processes.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+        self.scrollbar_state = self.scrollbar_state.position(i);
+        info!("Down to {}", i)
+    }
 }
 
 impl Component for Home {
@@ -83,8 +152,15 @@ impl Component for Home {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         self.last_events.push(key);
+        debug!("KEY: {:?}", key);
         let action = match self.mode {
-            Mode::Normal | Mode::Processing => return Ok(None),
+            Mode::Normal | Mode::Processing => match key.code {
+                KeyCode::Up => Action::Up,
+                KeyCode::Down => Action::Down,
+                KeyCode::Esc => Action::Quit,
+                _ => Action::Update,
+            },
+            // return Ok(None),
             Mode::Insert => match key.code {
                 KeyCode::Esc => Action::EnterNormal,
                 KeyCode::Enter => {
@@ -113,6 +189,8 @@ impl Component for Home {
             Action::ToggleShowHelp => self.show_help = !self.show_help,
             Action::ScheduleIncrement => self.schedule_increment(1),
             Action::ScheduleDecrement => self.schedule_decrement(1),
+            Action::Up => self.up(1),
+            Action::Down => self.down(1),
             // Action::Increment(i) => self.increment(i),
             // Action::Decrement(i) => self.decrement(i),
             // Action::CompleteInput(s) => self.add(s),
@@ -140,12 +218,7 @@ impl Component for Home {
             .constraints([Percentage(100)])
             .split(f.size());
 
-        let processes = model::get_all_processes();
-        let brt_processes = model::get_processes(&processes);
-        let rows = model::create_rows(&brt_processes);
-
-        let mut state = TableState::default().with_selected(0);
-        let mut scrollbar_state = ScrollbarState::new(processes.len() - 1);
+        let rows = model::create_rows(&self.processes);
 
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
@@ -195,14 +268,14 @@ impl Component for Home {
             .header(header)
             .highlight_style(selected_style);
 
-        f.render_stateful_widget(table, layout[0], &mut state);
+        f.render_stateful_widget(table, layout[0], &mut self.state);
         f.render_stateful_widget(
             scrollbar,
             layout[0].inner(&Margin {
                 vertical: 1,
                 horizontal: 1,
             }),
-            &mut scrollbar_state,
+            &mut self.scrollbar_state,
         );
         Ok(())
     }
