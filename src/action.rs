@@ -22,6 +22,7 @@ pub enum Action {
     EnterInsert,
     EnterProcessing,
     ExitProcessing,
+    Up,
+    Down,
     Update,
 }
-//// ANCHOR_END: action_enum

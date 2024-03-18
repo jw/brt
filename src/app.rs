@@ -101,9 +101,6 @@ impl App {
             }
 
             while let Ok(action) = action_rx.try_recv() {
-                if action != Action::Tick && action != Action::Render {
-                    log::debug!("{action:?}");
-                }
                 match action {
                     Action::Tick => {
                         self.last_tick_key_events.drain(..);
