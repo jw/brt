@@ -68,6 +68,10 @@ impl Process {
 
     pub fn tick(&mut self) {
         self.app_ticker = self.app_ticker.saturating_add(1);
+        if self.app_ticker % 5 == 0 {
+            self.processes = Self::get_processes();
+            info!("Refreshed process list.");
+        }
         self.last_events.drain(..);
     }
 
@@ -110,7 +114,7 @@ impl Process {
     pub fn jump(&mut self, steps: i64) {
         let location = self.state.selected().unwrap_or(0) as i64;
         let length = self.processes.len() as i64;
-        info!(
+        debug!(
             "Move {} steps in [{}..{}] when current location is {}.",
             steps, 0, length, location
         );
@@ -119,7 +123,7 @@ impl Process {
             index += length;
         }
         let new_location = (index % length) as usize;
-        info!("New location is {}.", new_location);
+        debug!("New location is {}.", new_location);
         self.state.select(Some(new_location));
         self.scrollbar_state = self.scrollbar_state.position(new_location);
     }
