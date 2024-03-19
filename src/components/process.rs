@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use log::{debug, error, info};
 use ratatui::layout::Constraint::Percentage;
-use ratatui::widgets::block::Title;
+use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::TableState;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
@@ -22,7 +22,7 @@ pub enum Mode {
     Processing,
 }
 
-pub struct Home {
+pub struct Process {
     pub show_help: bool,
     pub app_ticker: usize,
     pub render_ticker: usize,
@@ -36,19 +36,19 @@ pub struct Home {
     pub last_events: Vec<KeyEvent>,
 }
 
-impl Default for Home {
-    fn default() -> Home {
-        let processes = Self::foo_processes();
+impl Default for Process {
+    fn default() -> Process {
+        let processes = Self::get_processes();
         let length = processes.len();
-        Home {
+        Process {
             show_help: false,
             app_ticker: 0,
             render_ticker: 0,
             mode: Default::default(),
             input: Default::default(),
             processes,
-            scrollbar_state: Self::foo_scrollbar_state(length),
-            state: Default::default(),
+            scrollbar_state: Self::get_scrollbar_state(length),
+            state: TableState::new().with_selected(Some(0)),
             action_tx: None,
             keymap: Default::default(),
             last_events: vec![],
@@ -56,7 +56,7 @@ impl Default for Home {
     }
 }
 
-impl Home {
+impl Process {
     pub fn new() -> Self {
         Self::default()
     }
@@ -71,17 +71,15 @@ impl Home {
         self.last_events.drain(..);
     }
 
-    pub fn foo_processes() -> Vec<BrtProcess> {
+    pub fn get_processes() -> Vec<BrtProcess> {
         let processes = model::get_all_processes();
         let processes = model::get_processes(&processes);
         info!("Found {} processes.", processes.len());
         processes
     }
 
-    pub fn foo_scrollbar_state(length: usize) -> ScrollbarState {
-        let scrollbar_state = ScrollbarState::new(length);
-        info!("State: {:?}", scrollbar_state);
-        scrollbar_state
+    pub fn get_scrollbar_state(length: usize) -> ScrollbarState {
+        ScrollbarState::new(length)
     }
 
     pub fn render_tick(&mut self) {
@@ -109,42 +107,75 @@ impl Home {
         });
     }
 
-    pub fn up(&mut self, s: usize) {
-        info!("Up {}", s);
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.processes.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-        info!("Up to {}", i)
-    }
-
-    pub fn down(&mut self, s: usize) {
-        info!("Down {}", s);
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.processes.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-        self.scrollbar_state = self.scrollbar_state.position(i);
-        info!("Down to {}", i)
+    pub fn jump(&mut self, steps: i64) {
+        let location = self.state.selected().unwrap_or(0) as i64;
+        let length = self.processes.len() as i64;
+        info!(
+            "Move {} steps in [{}..{}] when current location is {}.",
+            steps, 0, length, location
+        );
+        let mut index = location + steps;
+        while index < 0 {
+            index += length;
+        }
+        let new_location = (index % length) as usize;
+        info!("New location is {}.", new_location);
+        self.state.select(Some(new_location));
+        self.scrollbar_state = self.scrollbar_state.position(new_location);
     }
 }
 
-impl Component for Home {
+#[allow(dead_code)]
+fn j(length: i64, i: i64, steps: i64) -> i64 {
+    let mut index = i + steps;
+    while index < 0 {
+        index += length;
+    }
+    index % length
+}
+
+#[test]
+fn test_jump() {
+    let length = 50;
+    let i = 10;
+    let steps = 20;
+    assert_eq!(j(length, i, steps), 30);
+    let i = 30;
+    let steps = -20;
+    assert_eq!(j(length, i, steps), 10);
+    let i = 40;
+    let steps = 25;
+    assert_eq!(j(length, i, steps), 15);
+    let i = 40;
+    let steps = 200;
+    assert_eq!(j(length, i, steps), 40);
+    let i = 40;
+    let steps = 205;
+    assert_eq!(j(length, i, steps), 45);
+    let i = 40;
+    let steps = -10;
+    assert_eq!(j(length, i, steps), 30);
+    let i = 40;
+    let steps = -40;
+    assert_eq!(j(length, i, steps), 0);
+    let i = 10;
+    let steps = -10;
+    assert_eq!(j(length, i, steps), 0);
+    let i = 10;
+    let steps = -20;
+    assert_eq!(j(length, i, steps), 40);
+    let i = 10;
+    let steps = -11;
+    assert_eq!(j(length, i, steps), 49);
+    let i = 10;
+    let steps = -150;
+    assert_eq!(j(length, i, steps), 10);
+    let i = 10;
+    let steps = -155;
+    assert_eq!(j(length, i, steps), 5);
+}
+
+impl Component for Process {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx);
         Ok(())
@@ -152,11 +183,13 @@ impl Component for Home {
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         self.last_events.push(key);
-        debug!("KEY: {:?}", key);
+        debug!("handling {:?}.", key);
         let action = match self.mode {
             Mode::Normal | Mode::Processing => match key.code {
                 KeyCode::Up => Action::Up,
                 KeyCode::Down => Action::Down,
+                KeyCode::PageUp => Action::PageUp,
+                KeyCode::PageDown => Action::PageDown,
                 KeyCode::Esc => Action::Quit,
                 _ => Action::Update,
             },
@@ -189,11 +222,10 @@ impl Component for Home {
             Action::ToggleShowHelp => self.show_help = !self.show_help,
             Action::ScheduleIncrement => self.schedule_increment(1),
             Action::ScheduleDecrement => self.schedule_decrement(1),
-            Action::Up => self.up(1),
-            Action::Down => self.down(1),
-            // Action::Increment(i) => self.increment(i),
-            // Action::Decrement(i) => self.decrement(i),
-            // Action::CompleteInput(s) => self.add(s),
+            Action::Up => self.jump(-1),
+            Action::Down => self.jump(1),
+            Action::PageUp => self.jump(-20),
+            Action::PageDown => self.jump(20),
             Action::EnterNormal => {
                 self.mode = Mode::Normal;
             }
@@ -247,8 +279,16 @@ impl Component for Home {
         .height(1)
         .style(Style::default().bold());
 
+        let processes = self.processes.len();
+        let process = format!("{}/{}", self.state.selected().unwrap() + 1, processes);
+
         let block = Block::default()
             .title(Title::from("brt").alignment(Alignment::Center))
+            .title(
+                Title::from(process)
+                    .position(Position::Bottom)
+                    .alignment(Alignment::Right),
+            )
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::White))
             .border_type(BorderType::Rounded);
