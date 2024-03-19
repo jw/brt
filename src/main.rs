@@ -3,6 +3,7 @@ pub mod app;
 pub mod cli;
 pub mod components;
 pub mod config;
+pub mod model;
 pub mod tui;
 pub mod utils;
 

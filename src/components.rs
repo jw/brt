@@ -10,7 +10,6 @@ use crate::{
 };
 
 pub mod fps;
-pub mod model;
 pub mod process;
 
 pub trait Component {

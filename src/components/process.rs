@@ -10,9 +10,9 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
-use super::{model, Component, Frame};
+use super::{Component, Frame};
 use crate::action::Action;
-use crate::components::model::BrtProcess;
+use crate::model::{create_rows, get_all_processes, get_processes, BrtProcess};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub enum Mode {
@@ -76,8 +76,8 @@ impl Process {
     }
 
     pub fn get_processes() -> Vec<BrtProcess> {
-        let processes = model::get_all_processes();
-        let processes = model::get_processes(&processes);
+        let processes = get_all_processes();
+        let processes = get_processes(&processes);
         info!("Found {} processes.", processes.len());
         processes
     }
@@ -254,7 +254,7 @@ impl Component for Process {
             .constraints([Percentage(100)])
             .split(f.size());
 
-        let rows = model::create_rows(&self.processes);
+        let rows = create_rows(&self.processes);
 
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
