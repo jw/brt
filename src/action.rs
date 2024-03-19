@@ -24,5 +24,7 @@ pub enum Action {
     ExitProcessing,
     Up,
     Down,
+    PageUp,
+    PageDown,
     Update,
 }
