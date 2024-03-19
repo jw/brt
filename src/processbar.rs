@@ -1,6 +1,9 @@
+pub mod model;
+
 use anyhow::{Context, Result};
 use clap::Parser;
 use log::debug;
+use model::get_memory;
 use owo_colors::OwoColorize;
 use procfs::process::Process;
 use procfs::{page_size, ticks_per_second, CpuInfo, Current, Uptime};
@@ -36,12 +39,17 @@ fn main() -> Result<()> {
     let num_cores = CpuInfo::current().unwrap().num_cores();
     debug!("num cores: {}", num_cores);
     let percentage = usage as f64 * 100.0 / runtime as f64 / num_cores as f64;
+
+    let memory = get_memory(&process);
+
     println!(
-        "{} ({}) has used {:.2}% of the cpu.",
+        "Process {} ({}) has used {:.2}% of the cpu and is using {} bytes of memory.",
         stat.comm.green(),
         pid.yellow(),
-        percentage.red(),
+        percentage.yellow(),
+        memory.yellow(),
     );
+
     Ok(())
 }
 

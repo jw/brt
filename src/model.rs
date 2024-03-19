@@ -152,7 +152,7 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
     Some(brt_process)
 }
 
-fn get_memory(process: &Process) -> u64 {
+pub fn get_memory(process: &Process) -> u64 {
     let statm = process.statm().unwrap();
     let page_size = procfs::page_size();
     statm.resident * page_size
