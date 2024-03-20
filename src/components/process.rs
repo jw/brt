@@ -13,7 +13,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::components::process::Order::{Command, Cpu, Name, Pid};
+use crate::components::process::Order::{Command, Cpu, Name, NumberOfThreads, Pid};
 use crate::model::{create_rows, get_all_processes, get_processes, BrtProcess};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
@@ -30,6 +30,7 @@ pub enum Order {
     Pid,
     Name,
     Command,
+    NumberOfThreads,
     Cpu,
 }
 
@@ -39,7 +40,8 @@ impl Order {
         match *self {
             Pid => Name,
             Name => Command,
-            Command => Cpu,
+            Command => NumberOfThreads,
+            NumberOfThreads => Cpu,
             Cpu => Pid,
         }
     }
@@ -48,7 +50,8 @@ impl Order {
         use Order::*;
         match *self {
             Pid => Cpu,
-            Cpu => Command,
+            Cpu => NumberOfThreads,
+            NumberOfThreads => Command,
             Command => Name,
             Name => Pid,
         }
@@ -61,6 +64,7 @@ impl fmt::Display for Order {
             Pid => write!(f, "pid"),
             Name => write!(f, "name"),
             Command => write!(f, "command"),
+            NumberOfThreads => write!(f, "threads"),
             Cpu => write!(f, "cpu"),
         }
     }
@@ -120,6 +124,7 @@ impl Process {
         self.app_ticker = self.app_ticker.saturating_add(1);
         if self.app_ticker % 5 == 0 {
             self.processes = Self::get_processes();
+            self.order_by_enum();
             info!("Refreshed process list.");
         }
         self.last_events.drain(..);
@@ -131,25 +136,34 @@ impl Process {
             Pid => self.order_by_pid(),
             Name => self.order_by_program(),
             Command => self.order_by_command(),
+            NumberOfThreads => self.order_by_number_of_threads(),
             Cpu => self.order_by_cpu(),
         }
     }
 
     pub fn order_by_pid(&mut self) {
-        self.processes.sort_by(|a, b| b.pid.cmp(&a.pid))
+        self.processes.sort_by(|a, b| a.pid.cmp(&b.pid))
+    }
+
+    pub fn order_by_program(&mut self) {
+        self.processes.sort_by(|a, b| a.program.cmp(&b.program))
+    }
+
+    pub fn order_by_command(&mut self) {
+        self.processes.sort_by(|a, b| a.command.cmp(&b.command))
+    }
+
+    pub fn order_by_number_of_threads(&mut self) {
+        self.processes.sort_by(|a, b| {
+            a.number_of_threads
+                .partial_cmp(&b.number_of_threads)
+                .unwrap()
+        })
     }
 
     pub fn order_by_cpu(&mut self) {
         self.processes
-            .sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap())
-    }
-
-    pub fn order_by_program(&mut self) {
-        self.processes.sort_by(|a, b| b.program.cmp(&a.program))
-    }
-
-    pub fn order_by_command(&mut self) {
-        self.processes.sort_by(|a, b| b.command.cmp(&a.command))
+            .sort_by(|a, b| a.cpu.partial_cmp(&b.cpu).unwrap())
     }
 
     pub fn get_processes() -> Vec<BrtProcess> {
