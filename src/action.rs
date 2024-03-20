@@ -26,5 +26,7 @@ pub enum Action {
     Down,
     PageUp,
     PageDown,
+    Left,
+    Right,
     Update,
 }

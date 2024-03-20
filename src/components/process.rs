@@ -1,4 +1,5 @@
-use std::{collections::HashMap, time::Duration};
+use std::default::Default;
+use std::{collections::HashMap, fmt, time::Duration};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -12,6 +13,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::process::Order::{Command, Cpu, Name, Pid};
 use crate::model::{create_rows, get_all_processes, get_processes, BrtProcess};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
@@ -22,6 +24,48 @@ pub enum Mode {
     Processing,
 }
 
+#[derive(Default, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Order {
+    #[default]
+    Pid,
+    Name,
+    Command,
+    Cpu,
+}
+
+impl Order {
+    fn next(&self) -> Self {
+        use Order::*;
+        match *self {
+            Pid => Name,
+            Name => Command,
+            Command => Cpu,
+            Cpu => Pid,
+        }
+    }
+
+    fn previous(&self) -> Self {
+        use Order::*;
+        match *self {
+            Pid => Cpu,
+            Cpu => Command,
+            Command => Name,
+            Name => Pid,
+        }
+    }
+}
+
+impl fmt::Display for Order {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Pid => write!(f, "pid"),
+            Name => write!(f, "name"),
+            Command => write!(f, "command"),
+            Cpu => write!(f, "cpu"),
+        }
+    }
+}
+
 pub struct Process {
     pub show_help: bool,
     pub app_ticker: usize,
@@ -29,6 +73,7 @@ pub struct Process {
     pub mode: Mode,
     pub input: Input,
     pub processes: Vec<BrtProcess>,
+    pub order: Order,
     pub scrollbar_state: ScrollbarState,
     pub state: TableState,
     pub action_tx: Option<UnboundedSender<Action>>,
@@ -47,6 +92,7 @@ impl Default for Process {
             mode: Default::default(),
             input: Default::default(),
             processes,
+            order: Default::default(),
             scrollbar_state: Self::get_scrollbar_state(length),
             state: TableState::new().with_selected(Some(0)),
             action_tx: None,
@@ -66,6 +112,10 @@ impl Process {
         self
     }
 
+    pub fn order_string(&mut self) -> String {
+        format!("{} {} {}", "<".red(), self.order, ">".red())
+    }
+
     pub fn tick(&mut self) {
         self.app_ticker = self.app_ticker.saturating_add(1);
         if self.app_ticker % 5 == 0 {
@@ -73,6 +123,33 @@ impl Process {
             info!("Refreshed process list.");
         }
         self.last_events.drain(..);
+    }
+
+    pub fn order_by_enum(&mut self) {
+        let order = self.order;
+        match order {
+            Pid => self.order_by_pid(),
+            Name => self.order_by_program(),
+            Command => self.order_by_command(),
+            Cpu => self.order_by_cpu(),
+        }
+    }
+
+    pub fn order_by_pid(&mut self) {
+        self.processes.sort_by(|a, b| b.pid.cmp(&a.pid))
+    }
+
+    pub fn order_by_cpu(&mut self) {
+        self.processes
+            .sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap())
+    }
+
+    pub fn order_by_program(&mut self) {
+        self.processes.sort_by(|a, b| b.program.cmp(&a.program))
+    }
+
+    pub fn order_by_command(&mut self) {
+        self.processes.sort_by(|a, b| b.command.cmp(&a.command))
     }
 
     pub fn get_processes() -> Vec<BrtProcess> {
@@ -194,6 +271,8 @@ impl Component for Process {
                 KeyCode::Down => Action::Down,
                 KeyCode::PageUp => Action::PageUp,
                 KeyCode::PageDown => Action::PageDown,
+                KeyCode::Left => Action::Left,
+                KeyCode::Right => Action::Right,
                 KeyCode::Esc => Action::Quit,
                 _ => Action::Update,
             },
@@ -230,6 +309,14 @@ impl Component for Process {
             Action::Down => self.jump(1),
             Action::PageUp => self.jump(-20),
             Action::PageDown => self.jump(20),
+            Action::Left => {
+                self.order = self.order.previous();
+                self.order_by_enum();
+            }
+            Action::Right => {
+                self.order = self.order.next();
+                self.order_by_enum();
+            }
             Action::EnterNormal => {
                 self.mode = Mode::Normal;
             }
@@ -288,6 +375,7 @@ impl Component for Process {
 
         let block = Block::default()
             .title(Title::from("brt").alignment(Alignment::Center))
+            .title(Title::from(self.order_string()).alignment(Alignment::Left))
             .title(
                 Title::from(process)
                     .position(Position::Bottom)

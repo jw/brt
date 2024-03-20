@@ -70,14 +70,14 @@ pub fn get_processes(all_processes: &Vec<Process>) -> Vec<BrtProcess> {
 
 // #[derive(Copy)]
 pub struct BrtProcess {
-    pid: i32,
-    ppid: i32,
-    program: String,
-    command: String,
-    number_of_threads: i64,
-    user: Option<User>,
-    resident_memory: u64,
-    cpu: f64,
+    pub pid: i32,
+    pub ppid: i32,
+    pub program: String,
+    pub command: String,
+    pub number_of_threads: i64,
+    pub user: Option<User>,
+    pub resident_memory: u64,
+    pub cpu: f64,
 }
 
 impl Default for BrtProcess {
