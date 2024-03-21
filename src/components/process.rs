@@ -3,26 +3,18 @@ use std::{collections::HashMap, fmt, time::Duration};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use log::{debug, error, info};
+use log::{debug, info};
 use ratatui::layout::Constraint::Percentage;
 use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::TableState;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
-use tui_input::{backend::crossterm::EventHandler, Input};
+use tui_input::Input;
 
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::components::process::Order::{Command, Cpu, Name, NumberOfThreads, Pid};
 use crate::model::{create_rows, get_all_processes, get_processes, BrtProcess};
-
-#[derive(Default, Copy, Clone, PartialEq, Eq)]
-pub enum Mode {
-    #[default]
-    Normal,
-    Insert,
-    Processing,
-}
 
 #[derive(Default, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Order {
@@ -74,7 +66,6 @@ pub struct Process {
     pub show_help: bool,
     pub app_ticker: usize,
     pub render_ticker: usize,
-    pub mode: Mode,
     pub input: Input,
     pub processes: Vec<BrtProcess>,
     pub order: Order,
@@ -93,7 +84,6 @@ impl Default for Process {
             show_help: false,
             app_ticker: 0,
             render_ticker: 0,
-            mode: Default::default(),
             input: Default::default(),
             processes,
             order: Default::default(),
@@ -279,35 +269,15 @@ impl Component for Process {
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
         self.last_events.push(key);
         debug!("handling {:?}.", key);
-        let action = match self.mode {
-            Mode::Normal | Mode::Processing => match key.code {
-                KeyCode::Up => Action::Up,
-                KeyCode::Down => Action::Down,
-                KeyCode::PageUp => Action::PageUp,
-                KeyCode::PageDown => Action::PageDown,
-                KeyCode::Left => Action::Left,
-                KeyCode::Right => Action::Right,
-                KeyCode::Esc => Action::Quit,
-                _ => Action::Update,
-            },
-            // return Ok(None),
-            Mode::Insert => match key.code {
-                KeyCode::Esc => Action::EnterNormal,
-                KeyCode::Enter => {
-                    if let Some(sender) = &self.action_tx {
-                        if let Err(e) =
-                            sender.send(Action::CompleteInput(self.input.value().to_string()))
-                        {
-                            error!("Failed to send action: {:?}", e);
-                        }
-                    }
-                    Action::EnterNormal
-                }
-                _ => {
-                    self.input.handle_event(&crossterm::event::Event::Key(key));
-                    Action::Update
-                }
-            },
+        let action = match key.code {
+            KeyCode::Up => Action::Up,
+            KeyCode::Down => Action::Down,
+            KeyCode::PageUp => Action::PageUp,
+            KeyCode::PageDown => Action::PageDown,
+            KeyCode::Left => Action::Left,
+            KeyCode::Right => Action::Right,
+            KeyCode::Esc => Action::Quit,
+            _ => Action::Update,
         };
         Ok(Some(action))
     }
@@ -331,19 +301,7 @@ impl Component for Process {
                 self.order = self.order.next();
                 self.order_by_enum();
             }
-            Action::EnterNormal => {
-                self.mode = Mode::Normal;
-            }
-            Action::EnterInsert => {
-                self.mode = Mode::Insert;
-            }
-            Action::EnterProcessing => {
-                self.mode = Mode::Processing;
-            }
-            Action::ExitProcessing => {
-                // TODO: Make this go to previous mode instead
-                self.mode = Mode::Normal;
-            }
+            Action::ExitProcessing => {}
             _ => (),
         }
         Ok(None)
