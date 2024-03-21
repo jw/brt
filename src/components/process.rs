@@ -1,5 +1,5 @@
 use std::default::Default;
-use std::{collections::HashMap, fmt, time::Duration};
+use std::{fmt, time::Duration};
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -72,7 +72,6 @@ pub struct Process {
     pub scrollbar_state: ScrollbarState,
     pub state: TableState,
     pub action_tx: Option<UnboundedSender<Action>>,
-    pub keymap: HashMap<KeyEvent, Action>,
     pub last_events: Vec<KeyEvent>,
 }
 
@@ -90,7 +89,6 @@ impl Default for Process {
             scrollbar_state: Self::get_scrollbar_state(length),
             state: TableState::new().with_selected(Some(0)),
             action_tx: None,
-            keymap: Default::default(),
             last_events: vec![],
         }
     }
@@ -99,11 +97,6 @@ impl Default for Process {
 impl Process {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn keymap(mut self, keymap: HashMap<KeyEvent, Action>) -> Self {
-        self.keymap = keymap;
-        self
     }
 
     pub fn order_string(&mut self) -> String {
