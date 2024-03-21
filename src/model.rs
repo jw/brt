@@ -153,7 +153,7 @@ fn create_process(process: &Process) -> Option<BrtProcess> {
 }
 
 pub fn get_memory(process: &Process) -> u64 {
-    let statm = process.statm().unwrap();
+    let statm = process.statm().unwrap(); // TODO: this can be: NotFound(Some("/proc/3955386/statm"))
     let page_size = procfs::page_size();
     statm.resident * page_size
 }

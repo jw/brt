@@ -29,15 +29,20 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
+    pub fn new(tick_rate: f64, frame_rate: f64, fps_arg: bool) -> Result<Self> {
         let process = Process::new();
-        let fps = FpsCounter::new();
+        let components: Vec<Box<dyn Component>> = if fps_arg {
+            let fps = FpsCounter::new();
+            vec![Box::new(process), Box::new(fps)]
+        } else {
+            vec![Box::new(process)]
+        };
         let config = Config::new()?;
         let mode = Mode::Process;
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(process), Box::new(fps)],
+            components,
             should_quit: false,
             should_suspend: false,
             config,

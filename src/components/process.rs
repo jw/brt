@@ -178,7 +178,7 @@ impl Process {
     }
 
     pub fn render_tick(&mut self) {
-        log::debug!("Render Tick");
+        debug!("Render Tick");
         self.render_ticker = self.render_ticker.saturating_add(1);
     }
 
@@ -389,7 +389,7 @@ impl Component for Process {
 
         let block = Block::default()
             .title(Title::from("brt").alignment(Alignment::Center))
-            .title(Title::from(self.order_string()).alignment(Alignment::Left))
+            .title(Title::from(self.order_string()).alignment(Alignment::Right))
             .title(
                 Title::from(process)
                     .position(Position::Bottom)

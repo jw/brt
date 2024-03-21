@@ -22,4 +22,13 @@ pub struct Cli {
         default_value_t = 60.0
     )]
     pub frame_rate: f64,
+
+    #[arg(
+        short = 'x',
+        long,
+        value_name = "BOOL",
+        help = "Show the fps or not",
+        default_value_t = false
+    )]
+    pub fps: bool,
 }
