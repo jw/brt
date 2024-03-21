@@ -72,7 +72,6 @@ pub struct Process {
     pub scrollbar_state: ScrollbarState,
     pub state: TableState,
     pub action_tx: Option<UnboundedSender<Action>>,
-    pub last_events: Vec<KeyEvent>,
 }
 
 impl Default for Process {
@@ -89,7 +88,6 @@ impl Default for Process {
             scrollbar_state: Self::get_scrollbar_state(length),
             state: TableState::new().with_selected(Some(0)),
             action_tx: None,
-            last_events: vec![],
         }
     }
 }
@@ -110,7 +108,6 @@ impl Process {
             self.order_by_enum();
             info!("Refreshed process list.");
         }
-        self.last_events.drain(..);
     }
 
     pub fn order_by_enum(&mut self) {
@@ -260,8 +257,7 @@ impl Component for Process {
     }
 
     fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        self.last_events.push(key);
-        debug!("handling {:?}.", key);
+        debug!("Handling {:?}.", key);
         let action = match key.code {
             KeyCode::Up => Action::Up,
             KeyCode::Down => Action::Down,
