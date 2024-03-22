@@ -97,3 +97,37 @@ impl Component for FpsCounter {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_fps_app_tick() {
+        let mut fps = FpsCounter::default();
+        let _ = fps.app_tick();
+        assert_eq!(fps.app_frames, 1);
+    }
+
+    #[test]
+    fn test_fps_render_tick() {
+        let mut fps = FpsCounter::default();
+        let _ = fps.render_tick();
+        assert_eq!(fps.render_frames, 1);
+    }
+
+    #[test]
+    fn test_fps_update_tick() {
+        let mut fps = FpsCounter::default();
+        let _ = fps.update(Action::Tick);
+        assert_eq!(fps.app_frames, 1);
+        assert_eq!(fps.render_frames, 0);
+    }
+
+    #[test]
+    fn test_fps_update_render() {
+        let mut fps = FpsCounter::default();
+        let _ = fps.update(Action::Render);
+        assert_eq!(fps.render_frames, 1);
+        assert_eq!(fps.app_frames, 0);
+    }
+}
