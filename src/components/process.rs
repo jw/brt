@@ -200,56 +200,6 @@ impl Process {
     }
 }
 
-#[allow(dead_code)]
-fn j(length: i64, i: i64, steps: i64) -> i64 {
-    let mut index = i + steps;
-    while index < 0 {
-        index += length;
-    }
-    index % length
-}
-
-#[test]
-fn test_jump() {
-    let length = 50;
-    let i = 10;
-    let steps = 20;
-    assert_eq!(j(length, i, steps), 30);
-    let i = 30;
-    let steps = -20;
-    assert_eq!(j(length, i, steps), 10);
-    let i = 40;
-    let steps = 25;
-    assert_eq!(j(length, i, steps), 15);
-    let i = 40;
-    let steps = 200;
-    assert_eq!(j(length, i, steps), 40);
-    let i = 40;
-    let steps = 205;
-    assert_eq!(j(length, i, steps), 45);
-    let i = 40;
-    let steps = -10;
-    assert_eq!(j(length, i, steps), 30);
-    let i = 40;
-    let steps = -40;
-    assert_eq!(j(length, i, steps), 0);
-    let i = 10;
-    let steps = -10;
-    assert_eq!(j(length, i, steps), 0);
-    let i = 10;
-    let steps = -20;
-    assert_eq!(j(length, i, steps), 40);
-    let i = 10;
-    let steps = -11;
-    assert_eq!(j(length, i, steps), 49);
-    let i = 10;
-    let steps = -150;
-    assert_eq!(j(length, i, steps), 10);
-    let i = 10;
-    let steps = -155;
-    assert_eq!(j(length, i, steps), 5);
-}
-
 impl Component for Process {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.action_tx = Some(tx);
@@ -371,5 +321,27 @@ impl Component for Process {
             &mut self.scrollbar_state,
         );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_jump() {
+        let mut process = Process::default();
+        process.jump(5);
+        assert_eq!(process.state.selected(), Some(5));
+        process.jump(5);
+        assert_eq!(process.state.selected(), Some(10));
+        process.jump(-15);
+        assert_eq!(process.state.selected(), Some(process.processes.len() - 5));
+        process.jump(4);
+        assert_eq!(process.state.selected(), Some(process.processes.len() - 1));
+        process.jump(1);
+        assert_eq!(process.state.selected(), Some(0));
+        process.jump(1);
+        assert_eq!(process.state.selected(), Some(1));
     }
 }
