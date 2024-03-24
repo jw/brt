@@ -30,5 +30,5 @@ pub struct Cli {
         help = "Show the fps or not",
         default_value_t = false
     )]
-    pub fps: bool,
+    pub debug: bool,
 }

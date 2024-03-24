@@ -29,9 +29,9 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64, fps_arg: bool) -> Result<Self> {
+    pub fn new(tick_rate: f64, frame_rate: f64, debug: bool) -> Result<Self> {
         let process = Process::new();
-        let components: Vec<Box<dyn Component>> = if fps_arg {
+        let components: Vec<Box<dyn Component>> = if debug {
             let fps = FpsCounter::new();
             vec![Box::new(process), Box::new(fps)]
         } else {
