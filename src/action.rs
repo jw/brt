@@ -13,8 +13,6 @@ pub enum Action {
     Error(String),
     Help,
     ToggleShowHelp,
-    ScheduleIncrement,
-    ScheduleDecrement,
     Increment(usize),
     Decrement(usize),
     CompleteInput(String),

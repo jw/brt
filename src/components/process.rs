@@ -1,5 +1,5 @@
 use std::default::Default;
-use std::{fmt, time::Duration};
+use std::fmt;
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -85,7 +85,7 @@ impl Default for Process {
             input: Default::default(),
             processes,
             order: Default::default(),
-            scrollbar_state: Self::get_scrollbar_state(length),
+            scrollbar_state: ScrollbarState::new(length),
             state: TableState::new().with_selected(Some(0)),
             action_tx: None,
         }
@@ -153,33 +153,9 @@ impl Process {
         processes
     }
 
-    pub fn get_scrollbar_state(length: usize) -> ScrollbarState {
-        ScrollbarState::new(length)
-    }
-
     pub fn render_tick(&mut self) {
         debug!("Render Tick");
         self.render_ticker = self.render_ticker.saturating_add(1);
-    }
-
-    pub fn schedule_increment(&mut self, i: usize) {
-        let tx = self.action_tx.clone().unwrap();
-        tokio::spawn(async move {
-            tx.send(Action::EnterProcessing).unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            tx.send(Action::Increment(i)).unwrap();
-            tx.send(Action::ExitProcessing).unwrap();
-        });
-    }
-
-    pub fn schedule_decrement(&mut self, i: usize) {
-        let tx = self.action_tx.clone().unwrap();
-        tokio::spawn(async move {
-            tx.send(Action::EnterProcessing).unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            tx.send(Action::Decrement(i)).unwrap();
-            tx.send(Action::ExitProcessing).unwrap();
-        });
     }
 
     pub fn jump(&mut self, steps: i64) {
@@ -225,9 +201,6 @@ impl Component for Process {
         match action {
             Action::Tick => self.tick(),
             Action::Render => self.render_tick(),
-            Action::ToggleShowHelp => self.show_help = !self.show_help,
-            Action::ScheduleIncrement => self.schedule_increment(1),
-            Action::ScheduleDecrement => self.schedule_decrement(1),
             Action::Up => self.jump(-1),
             Action::Down => self.jump(1),
             Action::PageUp => self.jump(-20),
@@ -240,7 +213,6 @@ impl Component for Process {
                 self.order = self.order.next();
                 self.order_by_enum();
             }
-            Action::ExitProcessing => {}
             _ => (),
         }
         Ok(None)
@@ -331,6 +303,7 @@ mod tests {
     #[test]
     fn test_process_jump() {
         let mut process = Process::default();
+        assert_eq!(process.state.selected(), Some(0));
         process.jump(5);
         assert_eq!(process.state.selected(), Some(5));
         process.jump(5);
