@@ -50,6 +50,7 @@ config = "0.14.0"
 pretty_assertions = "1.4.0"
 derive_deref = "1.1.1"
 tui-input = { version = "0.8.0", features = ["serde"] }
+human-panic = "1.2.3"
 
 [dev-dependencies.cargo-husky]
 version = "1"
