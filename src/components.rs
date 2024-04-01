@@ -9,6 +9,7 @@ use crate::{
     tui::{Event, Frame},
 };
 
+pub mod battery;
 pub mod fps;
 pub mod process;
 
