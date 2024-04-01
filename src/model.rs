@@ -1,3 +1,4 @@
+use battery::Battery;
 use humansize::{format_size, FormatSizeOptions, BINARY};
 use log::{debug, warn};
 use procfs::process::{all_processes, Process};
@@ -8,12 +9,9 @@ use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row};
 use uzers::{get_user_by_uid, User};
 
-#[allow(dead_code)]
-pub fn get_battery() -> String {
+pub fn get_battery() -> Battery {
     let manager = battery::Manager::new().unwrap();
-    let battery = manager.batteries().unwrap().next().unwrap().unwrap();
-    let percentage = battery.state_of_charge().value * 100.0;
-    format!("{}%", percentage)
+    manager.batteries().unwrap().next().unwrap().unwrap()
 }
 
 pub fn create_rows<'a>(processes: &Vec<BrtProcess>) -> Vec<Row<'a>> {
