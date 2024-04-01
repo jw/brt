@@ -6,6 +6,7 @@ pub mod config;
 pub mod model;
 pub mod tui;
 pub mod utils;
+pub mod widgets;
 
 use clap::Parser;
 use cli::Cli;

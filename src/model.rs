@@ -50,6 +50,7 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
         ),
         Cell::new(username),
         Cell::new(format_size(process.resident_memory, humansize_options)).style(special_style),
+        Cell::new("12345"),
         Cell::new(format!("{:.2}", process.cpu)).style(special_style),
     ])
 }
