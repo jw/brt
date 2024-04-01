@@ -4,7 +4,7 @@ use std::fmt;
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use log::{debug, info};
-use ratatui::layout::Constraint::Percentage;
+use ratatui::layout::Constraint::{Fill, Length, Percentage};
 use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::TableState;
 use ratatui::{prelude::*, widgets::*};
@@ -244,6 +244,7 @@ impl Component for Process {
             Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
             Cell::new("User:"),
             Cell::new("MemB"),
+            Cell::new(""),
             Cell::new("Cpu%"),
         ]
         .iter()
@@ -271,11 +272,12 @@ impl Component for Process {
         let widths = [
             Percentage(5),
             Percentage(15),
-            Percentage(60),
+            Fill(1),
             Percentage(5),
             Percentage(5),
-            Percentage(5),
-            Percentage(5),
+            Length(5),
+            Length(5),
+            Length(5),
         ];
 
         let table = Table::new(rows, widths)
