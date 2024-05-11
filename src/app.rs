@@ -30,7 +30,8 @@ pub struct App {
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, debug: bool) -> Result<Self> {
-        let process = Process::new();
+        let mut process = Process::new();
+        process.refresh();
         let battery = Battery::new();
 
         let components: Vec<Box<dyn Component>> = if debug {

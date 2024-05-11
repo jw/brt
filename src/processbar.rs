@@ -52,6 +52,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-
-#[derive(Debug)]
-struct ProcessbarError(String);

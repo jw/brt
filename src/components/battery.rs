@@ -65,6 +65,7 @@ impl Component for Battery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::info;
     use ratatui::{backend::TestBackend, prelude::*};
 
     #[test]
@@ -76,7 +77,7 @@ mod tests {
         let _ = terminal.draw(|frame| {
             let _r = battery.draw(frame, Rect::new(3, 3, 10, 1));
             let b = frame.buffer_mut();
-            println!("{:#?}", b);
+            info!("{:#?}", b);
         });
         assert_eq!(true, true)
     }
