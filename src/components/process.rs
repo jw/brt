@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::default::Default;
 use std::fmt;
 
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use log::{debug, info};
+use log::{debug, info, warn};
+use procfs::process::all_processes;
 use ratatui::layout::Constraint::{Fill, Length, Percentage};
 use ratatui::widgets::block::{Position, Title};
 use ratatui::widgets::TableState;
@@ -14,7 +16,7 @@ use tui_input::Input;
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::components::process::Order::{Command, Cpu, Name, NumberOfThreads, Pid};
-use crate::model::{create_rows, get_all_processes, get_processes, BrtProcess};
+use crate::model::{create_rows, to_brt_process, BrtProcess};
 
 #[derive(Default, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Order {
@@ -62,39 +64,44 @@ impl fmt::Display for Order {
     }
 }
 
+#[derive(Default, Debug)]
 pub struct Process {
     pub show_help: bool,
     pub app_ticker: usize,
     pub render_ticker: usize,
     pub input: Input,
-    pub processes: Vec<BrtProcess>,
+    pub processes: HashMap<i32, BrtProcess>,
     pub order: Order,
     pub scrollbar_state: ScrollbarState,
     pub state: TableState,
     pub action_tx: Option<UnboundedSender<Action>>,
 }
 
-impl Default for Process {
-    fn default() -> Process {
-        let processes = Self::get_processes();
-        let length = processes.len();
-        Process {
-            show_help: false,
-            app_ticker: 0,
-            render_ticker: 0,
-            input: Default::default(),
-            processes,
-            order: Default::default(),
-            scrollbar_state: ScrollbarState::new(length),
-            state: TableState::new().with_selected(Some(0)),
-            action_tx: None,
-        }
-    }
-}
-
 impl Process {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new() -> Process {
+        let mut process = Process::default();
+        process.processes = process.get_processes();
+        process.state = TableState::new().with_selected(Some(0));
+        process
+    }
+
+    pub fn refresh(&mut self) {
+        let length = self.processes.len();
+        let new_processes = self.get_processes();
+        let mut updated_processes = HashMap::new();
+        for (pid, process) in new_processes {
+            let old_process_option = self.processes.get(&pid);
+            if old_process_option.is_some() {
+                let mut old_process = old_process_option.unwrap().clone();
+                old_process.cpus.push_back(process.cpu);
+                old_process.cpus.pop_front();
+                old_process.cpu_graph = crate::model::get_cpu_graph(&old_process.cpus);
+                updated_processes.insert(pid, old_process);
+            };
+        }
+        self.processes = updated_processes;
+        self.state.select(Some(0));
+        self.scrollbar_state = self.scrollbar_state.content_length(length);
     }
 
     pub fn order_string(&mut self) -> String {
@@ -103,11 +110,39 @@ impl Process {
 
     pub fn tick(&mut self) {
         self.app_ticker = self.app_ticker.saturating_add(1);
-        if self.app_ticker % 5 == 0 {
-            self.processes = Self::get_processes();
-            self.order_by_enum();
-            info!("Refreshed process list.");
-        }
+        // if self.app_ticker % 5 == 0 {
+        // self.processes = self.get_all_processes();
+        self.refresh();
+
+        self.order_by_enum();
+        info!("Refreshed process list.");
+        // }
+    }
+
+    fn get_processes(&mut self) -> HashMap<i32, BrtProcess> {
+        let processes: HashMap<i32, BrtProcess> = all_processes()
+            .expect("Can't read /proc")
+            .filter_map(|p| match p {
+                Ok(p) => {
+                    let brt_process = to_brt_process(&p);
+                    if brt_process.is_some() {
+                        Some((p.pid, brt_process?))
+                    } else {
+                        None
+                    }
+                }
+                Err(e) => match e {
+                    procfs::ProcError::NotFound(_) => None,
+                    procfs::ProcError::Io(_e, _path) => None,
+                    x => {
+                        warn!("Can't read process due to error {x:?}");
+                        None
+                    }
+                },
+            })
+            .collect();
+        // info!("{} processes: {:#?}", processes.len(), processes);
+        processes
     }
 
     pub fn order_by_enum(&mut self) {
@@ -122,35 +157,28 @@ impl Process {
     }
 
     pub fn order_by_pid(&mut self) {
-        self.processes.sort_by(|a, b| a.pid.cmp(&b.pid))
+        // self.processes.sort_by(|a, b| a.pid.cmp(&b.pid))
     }
 
     pub fn order_by_program(&mut self) {
-        self.processes.sort_by(|a, b| a.program.cmp(&b.program))
+        // self.processes.sort_by(|a, b| a.program.cmp(&b.program))
     }
 
     pub fn order_by_command(&mut self) {
-        self.processes.sort_by(|a, b| a.command.cmp(&b.command))
+        // self.processes.sort_by(|a, b| a.command.cmp(&b.command))
     }
 
     pub fn order_by_number_of_threads(&mut self) {
-        self.processes.sort_by(|a, b| {
-            a.number_of_threads
-                .partial_cmp(&b.number_of_threads)
-                .unwrap()
-        })
+        // self.processes.sort_by(|a, b| {
+        //     a.number_of_threads
+        //         .partial_cmp(&b.number_of_threads)
+        //         .unwrap()
+        // })
     }
 
     pub fn order_by_cpu(&mut self) {
-        self.processes
-            .sort_by(|a, b| a.cpu.partial_cmp(&b.cpu).unwrap())
-    }
-
-    pub fn get_processes() -> Vec<BrtProcess> {
-        let processes = get_all_processes();
-        let processes = get_processes(&processes);
-        info!("Found {} processes.", processes.len());
-        processes
+        // self.processes
+        //     .sort_by(|a, b| a.cpu.partial_cmp(&b.cpu).unwrap())
     }
 
     pub fn render_tick(&mut self) {
@@ -301,10 +329,19 @@ impl Component for Process {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn test_brt_process_new() {
+        let process = BrtProcess::new();
+        assert_eq!(process.pid, 0);
+        assert_eq!(process.cpus, VecDeque::from(vec![0_f64; 10]));
+    }
 
     #[test]
     fn test_process_jump() {
-        let mut process = Process::default();
+        let mut process = Process::new();
+        process.processes = process.get_processes();
         assert_eq!(process.state.selected(), Some(0));
         process.jump(5);
         assert_eq!(process.state.selected(), Some(5));
