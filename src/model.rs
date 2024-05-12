@@ -15,9 +15,9 @@ pub fn get_battery() -> Battery {
     manager.batteries().unwrap().next().unwrap().unwrap()
 }
 
-pub fn create_rows<'a>(processes: &HashMap<i32, BrtProcess>) -> Vec<Row<'a>> {
+pub fn create_rows<'a>(processes: &Vec<BrtProcess>) -> Vec<Row<'a>> {
     let mut rows = Vec::new();
-    for process in processes.values() {
+    for process in processes {
         let row = create_row(process);
         rows.push(row);
     }
@@ -68,7 +68,7 @@ fn get_points(cpu: &f64) -> i32 {
         status if between(status, 0.5_f64, 0.7_f64) => 3,
         status if between(status, 0.7_f64, 100_f64) => 4,
         _ => {
-            warn!("Invalid cpu found: {}; assuming zero.", cpu);
+            warn!("Invalid cpu found: {}; setting to zero.", cpu);
             0
         }
     }
