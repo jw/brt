@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::{
     action::Action,
-    components::{fps::FpsCounter, process::Process, Component},
+    components::{battery::Battery, fps::FpsCounter, process::Process, Component},
     config::Config,
     tui,
 };
@@ -30,12 +30,15 @@ pub struct App {
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, debug: bool) -> Result<Self> {
-        let process = Process::new();
+        let mut process = Process::new();
+        process.refresh();
+        let battery = Battery::new();
+
         let components: Vec<Box<dyn Component>> = if debug {
             let fps = FpsCounter::new();
-            vec![Box::new(process), Box::new(fps)]
+            vec![Box::new(process), Box::new(battery), Box::new(fps)]
         } else {
-            vec![Box::new(process)]
+            vec![Box::new(process), Box::new(battery)]
         };
         let config = Config::new()?;
         let mode = Mode::Process;
