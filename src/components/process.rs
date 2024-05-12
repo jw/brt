@@ -103,7 +103,6 @@ impl Process {
         }
         self.process_map = updated_processes;
         self.processes = self.process_map.clone().into_values().collect();
-        self.state.select(Some(0));
         self.scrollbar_state = self.scrollbar_state.content_length(length);
     }
 
