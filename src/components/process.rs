@@ -70,7 +70,8 @@ pub struct Process {
     pub app_ticker: usize,
     pub render_ticker: usize,
     pub input: Input,
-    pub processes: HashMap<i32, BrtProcess>,
+    pub process_map: HashMap<i32, BrtProcess>,
+    pub processes: Vec<BrtProcess>,
     pub order: Order,
     pub scrollbar_state: ScrollbarState,
     pub state: TableState,
@@ -80,17 +81,18 @@ pub struct Process {
 impl Process {
     pub fn new() -> Process {
         let mut process = Process::default();
-        process.processes = process.get_processes();
+        process.process_map = process.get_processes();
+        process.processes = process.process_map.clone().into_values().collect();
         process.state = TableState::new().with_selected(Some(0));
         process
     }
 
     pub fn refresh(&mut self) {
-        let length = self.processes.len();
+        let length = self.process_map.len();
         let new_processes = self.get_processes();
         let mut updated_processes = HashMap::new();
         for (pid, process) in new_processes {
-            let old_process_option = self.processes.get(&pid);
+            let old_process_option = self.process_map.get(&pid);
             if old_process_option.is_some() {
                 let mut old_process = old_process_option.unwrap().clone();
                 old_process.cpus.push_back(process.cpu);
@@ -99,7 +101,8 @@ impl Process {
                 updated_processes.insert(pid, old_process);
             };
         }
-        self.processes = updated_processes;
+        self.process_map = updated_processes;
+        self.processes = self.process_map.clone().into_values().collect();
         self.state.select(Some(0));
         self.scrollbar_state = self.scrollbar_state.content_length(length);
     }
@@ -141,7 +144,6 @@ impl Process {
                 },
             })
             .collect();
-        // info!("{} processes: {:#?}", processes.len(), processes);
         processes
     }
 
@@ -157,38 +159,38 @@ impl Process {
     }
 
     pub fn order_by_pid(&mut self) {
-        // self.processes.sort_by(|a, b| a.pid.cmp(&b.pid))
+        self.processes.sort_by(|a, b| a.pid.cmp(&b.pid))
     }
 
     pub fn order_by_program(&mut self) {
-        // self.processes.sort_by(|a, b| a.program.cmp(&b.program))
+        self.processes.sort_by(|a, b| a.program.cmp(&b.program))
     }
 
     pub fn order_by_command(&mut self) {
-        // self.processes.sort_by(|a, b| a.command.cmp(&b.command))
+        self.processes.sort_by(|a, b| a.command.cmp(&b.command))
     }
 
     pub fn order_by_number_of_threads(&mut self) {
-        // self.processes.sort_by(|a, b| {
-        //     a.number_of_threads
-        //         .partial_cmp(&b.number_of_threads)
-        //         .unwrap()
-        // })
+        self.processes.sort_by(|a, b| {
+            a.number_of_threads
+                .partial_cmp(&b.number_of_threads)
+                .unwrap()
+        })
     }
 
     pub fn order_by_cpu(&mut self) {
-        // self.processes
-        //     .sort_by(|a, b| a.cpu.partial_cmp(&b.cpu).unwrap())
+        self.processes
+            .sort_by(|a, b| a.cpu.partial_cmp(&b.cpu).unwrap())
     }
 
     pub fn render_tick(&mut self) {
-        debug!("Render Tick");
+        info!("Render Tick");
         self.render_ticker = self.render_ticker.saturating_add(1);
     }
 
     pub fn jump(&mut self, steps: i64) {
         let location = self.state.selected().unwrap_or(0) as i64;
-        let length = self.processes.len() as i64;
+        let length = self.process_map.len() as i64;
         debug!(
             "Move {} steps in [{}..{}] when current location is {}.",
             steps, 0, length, location
@@ -341,16 +343,22 @@ mod tests {
     #[test]
     fn test_process_jump() {
         let mut process = Process::new();
-        process.processes = process.get_processes();
+        process.process_map = process.get_processes();
         assert_eq!(process.state.selected(), Some(0));
         process.jump(5);
         assert_eq!(process.state.selected(), Some(5));
         process.jump(5);
         assert_eq!(process.state.selected(), Some(10));
         process.jump(-15);
-        assert_eq!(process.state.selected(), Some(process.processes.len() - 5));
+        assert_eq!(
+            process.state.selected(),
+            Some(process.process_map.len() - 5)
+        );
         process.jump(4);
-        assert_eq!(process.state.selected(), Some(process.processes.len() - 1));
+        assert_eq!(
+            process.state.selected(),
+            Some(process.process_map.len() - 1)
+        );
         process.jump(1);
         assert_eq!(process.state.selected(), Some(0));
         process.jump(1);
