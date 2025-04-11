@@ -1,13 +1,11 @@
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-
+use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Stylize;
-use ratatui::text::Line;
-use ratatui::widgets::{Paragraph, Row, TableState, Widget};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::widgets::{Paragraph,TableState, Widget};
 use ratatui::{DefaultTerminal, Frame};
 use tokio_stream::StreamExt;
 
@@ -23,14 +21,16 @@ async fn main() -> Result<()> {
 #[derive(Debug, Default)]
 struct App {
     should_quit: bool,
-    pull_requests: PullRequestListWidget,
+    battery_widget: BatteryWidget,
+    time_widget: TimeWidget,
 }
 
 impl App {
     const FRAMES_PER_SECOND: f32 = 60.0;
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        self.pull_requests.run();
+        self.battery_widget.run();
+        self.time_widget.run();
 
         let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
         let mut interval = tokio::time::interval(period);
@@ -46,11 +46,15 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]);
-        let [title_area, body_area] = vertical.areas(frame.area());
-        let title = Line::from("Ratatui async example").centered().bold();
-        frame.render_widget(title, title_area);
-        frame.render_widget(&self.pull_requests, body_area);
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![
+                Constraint::Percentage(50),
+                Constraint::Percentage(50),
+            ])
+            .split(frame.area());
+        frame.render_widget(&self.battery_widget, layout[0]);
+        frame.render_widget(&self.time_widget, layout[1]);
     }
 
     fn handle_event(&mut self, event: &Event) {
@@ -58,8 +62,8 @@ impl App {
             if key.kind == KeyEventKind::Press {
                 match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
-                    KeyCode::Char('j') | KeyCode::Down => self.pull_requests.scroll_down(),
-                    KeyCode::Char('k') | KeyCode::Up => self.pull_requests.scroll_up(),
+                    KeyCode::Char('j') | KeyCode::Down => self.battery_widget.scroll_down(),
+                    KeyCode::Char('k') | KeyCode::Up => self.battery_widget.scroll_up(),
                     _ => {}
                 }
             }
@@ -69,27 +73,20 @@ impl App {
 
 /// A widget that displays a list of pull requests.
 ///
-/// This is an async widget that fetches the list of pull requests from the GitHub API. It contains
-/// an inner `Arc<RwLock<PullRequestListState>>` that holds the state of the widget. Cloning the
+/// This is an async widget that fetches the battery information. It contains
+/// an inner `Arc<RwLock<BatteryState>>` that holds the state of the widget. Cloning the
 /// widget will clone the Arc, so you can pass it around to other threads, and this is used to spawn
 /// a background task to fetch the pull requests.
 #[derive(Debug, Clone, Default)]
-struct PullRequestListWidget {
-    state: Arc<RwLock<PullRequestListState>>,
+struct BatteryWidget {
+    state: Arc<RwLock<BatteryState>>,
 }
 
 #[derive(Debug, Default)]
-struct PullRequestListState {
+struct BatteryState {
     pull_requests: String,
     loading_state: LoadingState,
     table_state: TableState,
-}
-
-#[derive(Debug, Clone)]
-struct PullRequest {
-    id: String,
-    title: String,
-    url: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -101,7 +98,41 @@ enum LoadingState {
     // Error(String),
 }
 
-impl PullRequestListWidget {
+#[derive(Debug, Clone, Default)]
+struct TimeWidget {
+    state: Arc<RwLock<TimeState>>,
+}
+
+#[derive(Debug, Clone)]
+struct TimeState {
+    time: DateTime<Utc>,
+}
+
+impl Default for TimeState {
+    fn default() -> Self { Self { time: Utc::now() } }
+}
+
+impl TimeWidget {
+    fn run(&self) {
+        let this = self.clone(); // clone the widget to pass to the background task
+        tokio::spawn(this.time());
+    }
+    async fn time(self) {
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        loop {
+            let now = Utc::now();
+            self.on_load(&now);
+            interval.tick().await;
+        }
+    }
+    fn on_load(&self, time: &DateTime<Utc>) {
+        let mut state = self.state.write().unwrap();
+        state.time = *time;
+    }
+}
+
+
+impl BatteryWidget {
     /// Start fetching the pull requests in the background.
     ///
     /// This method spawns a background task that fetches the pull requests from the GitHub API.
@@ -165,7 +196,7 @@ impl PullRequestListWidget {
 //     }
 // }
 
-impl Widget for &PullRequestListWidget {
+impl Widget for &BatteryWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
         let p = Paragraph::new(state.pull_requests.as_str());
@@ -173,9 +204,12 @@ impl Widget for &PullRequestListWidget {
     }
 }
 
-impl From<&PullRequest> for Row<'_> {
-    fn from(pr: &PullRequest) -> Self {
-        let pr = pr.clone();
-        Row::new(vec![pr.id, pr.title, pr.url])
+impl Widget for &TimeWidget {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let state = self.state.write().unwrap();
+        let binding = state.time.format("%H:%M:%S%.3f").to_string();
+        let p = Paragraph::new(binding.as_str());
+        Widget::render(p, area, buf);
     }
 }
+
