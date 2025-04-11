@@ -84,7 +84,7 @@ struct BatteryWidget {
 
 #[derive(Debug, Default)]
 struct BatteryState {
-    pull_requests: String,
+    battery: String,
     loading_state: LoadingState,
     table_state: TableState,
 }
@@ -139,10 +139,10 @@ impl BatteryWidget {
     /// The result of the fetch is then passed to the `on_load` or `on_err` methods.
     fn run(&self) {
         let this = self.clone(); // clone the widget to pass to the background task
-        tokio::spawn(this.fetch_pulls());
+        tokio::spawn(this.battery());
     }
 
-    async fn fetch_pulls(self) {
+    async fn battery(self) {
         // this runs once, but you could also run this in a loop, using a channel that accepts
         // messages to refresh on demand, or with an interval timer to refresh every N seconds
         self.set_loading_state(LoadingState::Loading);
@@ -161,10 +161,10 @@ impl BatteryWidget {
         }
         self.on_load(&battery_state)
     }
-    fn on_load(&self, page: &str) {
+    fn on_load(&self, battery: &str) {
         let mut state = self.state.write().unwrap();
         state.loading_state = LoadingState::Loaded;
-        state.pull_requests = page.to_string();
+        state.battery = battery.to_string();
     }
 
     fn set_loading_state(&self, state: LoadingState) {
@@ -199,7 +199,7 @@ impl BatteryWidget {
 impl Widget for &BatteryWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
-        let p = Paragraph::new(state.pull_requests.as_str());
+        let p = Paragraph::new(state.battery.as_str());
         Widget::render(p, area, buf);
     }
 }
