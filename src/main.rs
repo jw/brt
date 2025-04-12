@@ -1,21 +1,25 @@
-use std::sync::{Arc, RwLock};
-use std::time::Duration;
+use battery::units::{Energy, Ratio, Time};
+use battery::{Manager, State};
 use chrono::{DateTime, Utc};
 use color_eyre::Result;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{Paragraph,TableState, Widget};
+use ratatui::widgets::{Paragraph, Widget};
 use ratatui::{DefaultTerminal, Frame};
+use std::error::Error;
+use std::fmt;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
-    let app_result = App::default().run(terminal).await;
+    let result = App::default().run(terminal).await;
     ratatui::restore();
-    app_result
+    result
 }
 
 #[derive(Debug, Default)]
@@ -29,7 +33,7 @@ impl App {
     const FRAMES_PER_SECOND: f32 = 60.0;
 
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        self.battery_widget.run();
+        let _ = self.battery_widget.run();
         self.time_widget.run();
 
         let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
@@ -79,14 +83,29 @@ impl App {
 /// a background task to fetch the pull requests.
 #[derive(Debug, Clone, Default)]
 struct BatteryWidget {
+    // manager: Arc<RwLock<Manager>>,
     state: Arc<RwLock<BatteryState>>,
 }
 
 #[derive(Debug, Default)]
 struct BatteryState {
-    battery: String,
     loading_state: LoadingState,
-    table_state: TableState,
+    battery: BrtBattery,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct BrtBattery {
+    state_of_health: Ratio,
+    time_to_empty: Option<Time>,
+    time_to_full: Option<Time>,
+    energy: Energy,
+    state: State,
+}
+
+impl fmt::Display for BrtBattery {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.state)
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -137,34 +156,41 @@ impl BatteryWidget {
     ///
     /// This method spawns a background task that fetches the pull requests from the GitHub API.
     /// The result of the fetch is then passed to the `on_load` or `on_err` methods.
-    fn run(&self) {
+    fn run(&self) -> Result<(), Box<dyn Error>> {
         let this = self.clone(); // clone the widget to pass to the background task
+        // let mut battery = Arc::new(Mutex::new(manager.batteries()?.next().ok_or("no battery found")));
         tokio::spawn(this.battery());
+        Ok(())
     }
 
     async fn battery(self) {
-        // this runs once, but you could also run this in a loop, using a channel that accepts
-        // messages to refresh on demand, or with an interval timer to refresh every N seconds
-        self.set_loading_state(LoadingState::Loading);
-        let manager = battery::Manager::new().expect("Could not get battery");
-        let mut battery_state = "".to_string();
-        for (idx, maybe_battery) in manager.batteries().expect("No battery found").enumerate() {
-            let battery = maybe_battery.expect("No battery found");
-            battery_state.push_str(format!("index #{}", idx).as_str());
-            battery_state.push_str(format!(" Vendor: {:?}", battery.vendor()).as_str());
-            battery_state.push_str(format!(" Model: {:?}", battery.model()).as_str());
-            battery_state.push_str(format!(" State: {:?}", battery.state()).as_str());
-            battery_state.push_str(format!(" Time to full charge: {:?}", battery.time_to_full()).as_str());
-            battery_state.push_str(format!(" serial: {:?}", battery.serial_number()).as_str());
-            battery_state.push_str(format!(" energy: {:?}", battery.energy()).as_str());
-            battery_state.push_str(format!(" energy: {:?}", battery.energy_full_design()).as_str());
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        loop {
+            self.set_loading_state(LoadingState::Loading);
+            let mut brt_battery = BrtBattery::default();
+            {
+                let manager = battery::Manager::new().expect("Failed to init battery manager");
+                {
+                    for (_, maybe_battery) in manager.batteries().expect("No battery found").enumerate() {
+                        let battery = maybe_battery.expect("No battery found");
+                        brt_battery.state_of_health = battery.state_of_health();
+                        brt_battery.time_to_empty = battery.time_to_empty();
+                        brt_battery.time_to_full = battery.time_to_full();
+                        brt_battery.energy = battery.energy();
+                        brt_battery.state = battery.state();
+                    }
+                    self.on_load(&brt_battery);
+                }
+            }
+            interval.tick().await;
+
         }
-        self.on_load(&battery_state)
     }
-    fn on_load(&self, battery: &str) {
+
+    fn on_load(&self, battery: &BrtBattery) {
         let mut state = self.state.write().unwrap();
         state.loading_state = LoadingState::Loaded;
-        state.battery = battery.to_string();
+        state.battery = *battery;
     }
 
     fn set_loading_state(&self, state: LoadingState) {
@@ -172,11 +198,9 @@ impl BatteryWidget {
     }
 
     fn scroll_down(&self) {
-        self.state.write().unwrap().table_state.scroll_down_by(1);
     }
 
     fn scroll_up(&self) {
-        self.state.write().unwrap().table_state.scroll_up_by(1);
     }
 }
 
@@ -199,7 +223,7 @@ impl BatteryWidget {
 impl Widget for &BatteryWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
-        let p = Paragraph::new(state.battery.as_str());
+        let p = Paragraph::new(format!("Battery state: {}", state.battery));
         Widget::render(p, area, buf);
     }
 }
