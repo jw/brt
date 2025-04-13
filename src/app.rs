@@ -3,7 +3,8 @@ use std::time::Duration;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout};
 use tokio_stream::StreamExt;
-use crate::{BatteryWidget, TimeWidget};
+use crate::TimeWidget;
+use crate::battery::BatteryWidget;
 
 #[derive(Debug, Default)]
 pub struct App {
