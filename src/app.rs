@@ -3,7 +3,7 @@ use std::time::Duration;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout};
 use tokio_stream::StreamExt;
-use crate::TimeWidget;
+use crate::time::TimeWidget;
 use crate::battery::BatteryWidget;
 
 #[derive(Debug, Default)]
