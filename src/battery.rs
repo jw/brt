@@ -11,13 +11,11 @@ use ratatui::widgets::Paragraph;
 
 #[derive(Debug, Clone, Default)]
 pub struct BatteryWidget {
-    // manager: Arc<RwLock<Manager>>,
     state: Arc<RwLock<BatteryState>>,
 }
 
 #[derive(Debug, Default)]
 struct BatteryState {
-    loading_state: LoadingState,
     battery: BrtBattery,
 }
 
@@ -36,23 +34,9 @@ impl fmt::Display for BrtBattery {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-enum LoadingState {
-    #[default]
-    Idle,
-    Loading,
-    Loaded,
-    // Error(String),
-}
-
 impl BatteryWidget {
-    /// Start fetching the pull requests in the background.
-    ///
-    /// This method spawns a background task that fetches the pull requests from the GitHub API.
-    /// The result of the fetch is then passed to the `on_load` or `on_err` methods.
     pub fn run(&self) -> color_eyre::Result<(), Box<dyn Error>> {
-        let this = self.clone(); // clone the widget to pass to the background task
-        // let mut battery = Arc::new(Mutex::new(manager.batteries()?.next().ok_or("no battery found")));
+        let this = self.clone();
         tokio::spawn(this.battery());
         Ok(())
     }
@@ -60,7 +44,6 @@ impl BatteryWidget {
     async fn battery(self) {
         let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
-            self.set_loading_state(LoadingState::Loading);
             let mut brt_battery = BrtBattery::default();
             {
                 let manager = battery::Manager::new().expect("Failed to init battery manager");
@@ -83,12 +66,7 @@ impl BatteryWidget {
 
     fn on_load(&self, battery: &BrtBattery) {
         let mut state = self.state.write().unwrap();
-        state.loading_state = LoadingState::Loaded;
         state.battery = *battery;
-    }
-
-    fn set_loading_state(&self, state: LoadingState) {
-        self.state.write().unwrap().loading_state = state;
     }
 
     pub fn scroll_down(&self) {
