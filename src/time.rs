@@ -2,7 +2,7 @@ use ratatui::prelude::Widget;
 use ratatui::layout::Rect;
 use ratatui::buffer::Buffer;
 use ratatui::widgets::Paragraph;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -13,11 +13,11 @@ pub struct TimeWidget {
 
 #[derive(Debug, Clone)]
 struct TimeState {
-    time: DateTime<Utc>,
+    time: DateTime<Local>,
 }
 
 impl Default for TimeState {
-    fn default() -> Self { Self { time: Utc::now() } }
+    fn default() -> Self { Self { time: Local::now() } }
 }
 
 impl TimeWidget {
@@ -28,12 +28,12 @@ impl TimeWidget {
     async fn time(self) {
         let mut interval = tokio::time::interval(Duration::from_millis(100));
         loop {
-            let now = Utc::now();
+            let now = Local::now();
             self.on_load(&now);
             interval.tick().await;
         }
     }
-    fn on_load(&self, time: &DateTime<Utc>) {
+    fn on_load(&self, time: &DateTime<Local>) {
         let mut state = self.state.write().unwrap();
         state.time = *time;
     }
