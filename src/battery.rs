@@ -1,5 +1,7 @@
+use battery::units::power::watt;
 use battery::units::ratio::percent;
-use battery::units::{Energy, Ratio, Time};
+use battery::units::time::second;
+use battery::units::{Energy, Power, Ratio, Time};
 use battery::State;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -8,6 +10,7 @@ use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 use std::str::FromStr;
 use std::string::ToString;
 use std::sync::{Arc, RwLock};
@@ -25,6 +28,7 @@ struct BatteryState {
     time_to_full: Option<Time>,
     energy: Energy,
     state: State,
+    energy_rate: Power,
 }
 
 impl fmt::Display for BatteryState {
@@ -54,6 +58,7 @@ impl BatteryWidget {
                         state.time_to_full = battery.time_to_full();
                         state.energy = battery.energy();
                         state.state = battery.state();
+                        state.energy_rate = battery.energy_rate();
                     }
                     self.on_load(&state);
                 }
@@ -67,7 +72,10 @@ impl BatteryWidget {
         let mut state = self.state.write().unwrap();
         state.state = battery_state.state;
         state.state_of_charge = battery_state.state_of_charge;
-
+        state.time_to_full = battery_state.time_to_full;
+        state.time_to_empty = battery_state.time_to_empty;
+        state.energy = battery_state.energy;
+        state.energy_rate = battery_state.energy_rate;
     }
 
     pub fn scroll_down(&self) {
@@ -97,23 +105,58 @@ impl Widget for &BatteryWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let state = self.state.write().unwrap();
         let percentage = state.state_of_charge.get::<percent>() as i32;
-        let line = line(&state.state, &percentage);
+        let time_to_empty = state.time_to_empty;
+        let time_to_full = state.time_to_full;
+        let energy_rate = state.energy_rate;
+        let line = line(&state.state, &percentage, time_to_empty, time_to_full, energy_rate);
         Widget::render(line, area, buf);
     }
 }
 
-fn line<'a>(state: &'a State, percentage: &'a i32) -> Line<'a> {
+fn line<'a>(state: &'a State, percentage: &'a i32, time_to_empty: Option<Time>, time_to_full: Option<Time>, energy_rate: Power) -> Line<'a> {
     let bat = Span::raw(format!(
         "BAT{} {}% ",
         get_state_symbol(*state),
         percentage,
     ));
-    let mut bar = bar(&percentage);
     let mut parts = vec![bat];
+
+    let mut bar = bar(&percentage);
     parts.append(&mut bar);
+
+    if let Some(time_to_empty) = time_to_empty {
+        let seconds_to_empty = time_to_empty.get::<second>() as i64;
+        let (hours, minutes) = seconds_to_hours_minutes(seconds_to_empty);
+        let time_to_empty = Span::raw(format!(
+            " {:02}:{:02}",
+            hours,
+            minutes,
+        ));
+        parts.push(time_to_empty);
+    }
+
+    if let Some(time_to_full) = time_to_full {
+        let seconds_to_full = time_to_full.get::<second>() as i64;
+        let (hours, minutes) = seconds_to_hours_minutes(seconds_to_full);
+        let time_to_full = Span::raw(format!(
+            " {:02}:{:02}",
+            hours,
+            minutes,
+        ));
+        parts.push(time_to_full);
+    }
+
+    let energy_rate = Span::raw(format!(" {:.2}W", energy_rate.get::<watt>()));
+    parts.push(energy_rate);
     Line::from(parts)
 }
 
+fn seconds_to_hours_minutes(seconds: i64) -> (i64, i64) {
+    let hours = seconds / 3600;
+    let remaining_seconds = seconds % 3600;
+    let minutes = remaining_seconds / 60;
+    (hours, minutes)
+}
 fn bar(percentage: &i32) -> Vec<Span> {
     let block_0 = Span::styled("■", Style::default().fg(Color::from_str("#d86453").unwrap()));
     let block_1 = Span::styled("■", Style::default().fg(Color::from_str("#d57b59").unwrap()));
