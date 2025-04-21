@@ -1,6 +1,6 @@
 [package]
 name = "brt"
-version = "0.1.8"
+version = "0.2.0-alpha.1"
 authors = ["Jan Willems <jw@elevenbits.com>"]
 keywords = ["terminal", "btop"]
 repository = "https://github.com/jw/brt"
@@ -22,8 +22,7 @@ ratatui = { version = "0.30.0-alpha.2", features = ["default", "unstable-widget-
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-stream = "0.1.17"
 
-
 [dev-dependencies.cargo-husky]
 version = "1"
 default-features = false
-features = ["user-hooks"]
+features = ["precommit-hook", "prepush-hook", "user-hooks"]

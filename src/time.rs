@@ -1,8 +1,8 @@
-use ratatui::prelude::Widget;
-use ratatui::layout::Rect;
-use ratatui::buffer::Buffer;
-use ratatui::widgets::Paragraph;
 use chrono::{DateTime, Local};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::prelude::Widget;
+use ratatui::widgets::Paragraph;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
@@ -17,7 +17,9 @@ struct TimeState {
 }
 
 impl Default for TimeState {
-    fn default() -> Self { Self { time: Local::now() } }
+    fn default() -> Self {
+        Self { time: Local::now() }
+    }
 }
 
 impl TimeWidget {

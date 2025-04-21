@@ -1,10 +1,10 @@
-use ratatui::{DefaultTerminal, Frame};
-use std::time::Duration;
+use crate::battery::BatteryWidget;
+use crate::time::TimeWidget;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::{DefaultTerminal, Frame};
+use std::time::Duration;
 use tokio_stream::StreamExt;
-use crate::time::TimeWidget;
-use crate::battery::BatteryWidget;
 
 #[derive(Debug, Default)]
 pub struct App {
@@ -36,10 +36,7 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
-            ])
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(frame.area());
         frame.render_widget(&self.battery_widget, layout[0]);
         frame.render_widget(&self.time_widget, layout[1]);
