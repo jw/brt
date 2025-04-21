@@ -1,5 +1,6 @@
 use crate::battery::BatteryWidget;
 use crate::time::TimeWidget;
+use crate::uptime::UptimeWidget;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::{DefaultTerminal, Frame};
@@ -11,6 +12,7 @@ pub struct App {
     should_quit: bool,
     battery_widget: BatteryWidget,
     time_widget: TimeWidget,
+    uptime_widget: UptimeWidget,
 }
 
 impl App {
@@ -19,6 +21,7 @@ impl App {
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
         let _ = self.battery_widget.run();
         self.time_widget.run();
+        self.uptime_widget.run();
 
         let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
         let mut interval = tokio::time::interval(period);
@@ -36,10 +39,15 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints(vec![
+                Constraint::Percentage(40),
+                Constraint::Percentage(40),
+                Constraint::Percentage(20),
+            ])
             .split(frame.area());
         frame.render_widget(&self.battery_widget, layout[0]);
         frame.render_widget(&self.time_widget, layout[1]);
+        frame.render_widget(&self.uptime_widget, layout[2]);
     }
 
     fn handle_event(&mut self, event: &Event) {

@@ -4,6 +4,7 @@ use color_eyre::Result;
 mod app;
 mod battery;
 mod time;
+mod uptime;
 
 #[tokio::main]
 async fn main() -> Result<()> {
