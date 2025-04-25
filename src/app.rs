@@ -1,4 +1,5 @@
 use crate::battery::BatteryWidget;
+use crate::procs::ProcWidget;
 use crate::time::TimeWidget;
 use crate::uptime::UptimeWidget;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
@@ -13,6 +14,7 @@ pub struct App {
     battery_widget: BatteryWidget,
     time_widget: TimeWidget,
     uptime_widget: UptimeWidget,
+    proc_widget: ProcWidget,
 }
 
 impl App {
@@ -22,6 +24,7 @@ impl App {
         let _ = self.battery_widget.run();
         self.time_widget.run();
         self.uptime_widget.run();
+        self.proc_widget.run();
 
         let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
         let mut interval = tokio::time::interval(period);
@@ -40,14 +43,16 @@ impl App {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Percentage(40),
-                Constraint::Percentage(40),
-                Constraint::Percentage(20),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
             ])
             .split(frame.area());
         frame.render_widget(&self.battery_widget, layout[0]);
         frame.render_widget(&self.time_widget, layout[1]);
         frame.render_widget(&self.uptime_widget, layout[2]);
+        frame.render_widget(&self.proc_widget, layout[3]);
     }
 
     fn handle_event(&mut self, event: &Event) {
