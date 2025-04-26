@@ -1,10 +1,12 @@
 use crate::battery::BatteryWidget;
+use crate::debug::DebugWidget;
 use crate::procs::ProcWidget;
 use crate::time::TimeWidget;
 use crate::uptime::UptimeWidget;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEventKind};
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::{DefaultTerminal, Frame};
+use std::fmt::Debug;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
@@ -15,7 +17,10 @@ pub struct App {
     time_widget: TimeWidget,
     uptime_widget: UptimeWidget,
     proc_widget: ProcWidget,
+    debug_widget: DebugWidget,
 }
+
+pub const INTERVAL: u64 = 10;
 
 impl App {
     const FRAMES_PER_SECOND: f32 = 60.0;
@@ -25,6 +30,7 @@ impl App {
         self.time_widget.run();
         self.uptime_widget.run();
         self.proc_widget.run();
+        self.debug_widget.run();
 
         let period = Duration::from_secs_f32(1.0 / Self::FRAMES_PER_SECOND);
         let mut interval = tokio::time::interval(period);
@@ -43,16 +49,18 @@ impl App {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
             ])
             .split(frame.area());
         frame.render_widget(&self.battery_widget, layout[0]);
         frame.render_widget(&self.time_widget, layout[1]);
         frame.render_widget(&self.uptime_widget, layout[2]);
         frame.render_widget(&self.proc_widget, layout[3]);
+        frame.render_widget(&self.debug_widget, layout[4]);
     }
 
     fn handle_event(&mut self, event: &Event) {

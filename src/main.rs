@@ -3,6 +3,7 @@ use color_eyre::Result;
 
 mod app;
 mod battery;
+mod debug;
 mod procs;
 mod time;
 mod uptime;

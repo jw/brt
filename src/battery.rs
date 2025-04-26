@@ -1,3 +1,4 @@
+use crate::app::INTERVAL;
 use battery::units::power::watt;
 use battery::units::ratio::percent;
 use battery::units::time::second;
@@ -45,7 +46,7 @@ impl BatteryWidget {
     }
 
     async fn battery(self) {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL));
         loop {
             let mut state = BatteryState::default();
             {

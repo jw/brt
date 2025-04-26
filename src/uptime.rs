@@ -1,3 +1,4 @@
+use crate::app::INTERVAL;
 use procfs::{FromRead, Uptime};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -31,7 +32,7 @@ impl UptimeWidget {
         tokio::spawn(this.time());
     }
     async fn time(self) {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL));
         loop {
             let f = File::open("/proc/uptime").expect("no /proc/uptime found");
             let uptime = Uptime::from_read(f);

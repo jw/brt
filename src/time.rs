@@ -1,3 +1,4 @@
+use crate::app::INTERVAL;
 use chrono::{DateTime, Local};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -28,7 +29,7 @@ impl TimeWidget {
         tokio::spawn(this.time());
     }
     async fn time(self) {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL));
         loop {
             let now = Local::now();
             self.on_load(&now);

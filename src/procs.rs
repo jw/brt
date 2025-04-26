@@ -1,3 +1,4 @@
+use crate::app::INTERVAL;
 use procfs::process::{all_processes, Process};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -50,7 +51,7 @@ impl ProcWidget {
         tokio::spawn(this.processes());
     }
     async fn processes(self) {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(INTERVAL));
         loop {
             let mut processes = vec![];
             for prc in all_processes().unwrap().flatten() {
