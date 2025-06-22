@@ -11,12 +11,6 @@ pub struct Home {
     config: Config,
 }
 
-impl Home {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 impl Component for Home {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
