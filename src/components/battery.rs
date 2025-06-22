@@ -1,17 +1,22 @@
+use chrono::{DateTime, Local};
+use ratatui::layout::Rect;
+use ratatui::prelude::*;
+use ratatui::widgets::Paragraph;
 use color_eyre::Result;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::text::ToText;
 use tokio::sync::mpsc::UnboundedSender;
-
+use crate::action::Action;
+use crate::config::Config;
 use super::Component;
-use crate::{action::Action, config::Config};
 
-#[derive(Default)]
-pub struct Home {
+#[derive(Debug, Clone, Default)]
+pub struct TimeWidget {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
+    time: DateTime<Local>,
 }
 
-impl Component for Home {
+impl Component for TimeWidget {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
         Ok(())
@@ -29,6 +34,7 @@ impl Component for Home {
             }
             Action::Render => {
                 // add any logic here that should run on every render
+                self.time = Local::now();
             }
             _ => {}
         }
@@ -36,7 +42,8 @@ impl Component for Home {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        frame.render_widget(Paragraph::new("hello world"), area);
+        frame.render_widget(Paragraph::new(self.time.format("%H:%M:%S%.3f").to_text()), area);
         Ok(())
     }
+
 }

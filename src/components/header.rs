@@ -1,27 +1,18 @@
+use chrono::{DateTime, Local};
 use color_eyre::Result;
+use ratatui::text::ToSpan;
 use ratatui::{prelude::*, widgets::*};
-use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::{action::Action, config::Config};
+use crate::action::Action;
 
 #[derive(Default)]
-pub struct Home {
-    command_tx: Option<UnboundedSender<Action>>,
-    config: Config,
+pub struct Header {
+    time: DateTime<Local>,
+    _interval: u32,
 }
 
-impl Component for Home {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
-
+impl Component for Header {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
@@ -29,6 +20,7 @@ impl Component for Home {
             }
             Action::Render => {
                 // add any logic here that should run on every render
+                self.time = Local::now();
             }
             _ => {}
         }
@@ -36,7 +28,10 @@ impl Component for Home {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        frame.render_widget(Paragraph::new("hello world"), area);
+        let [top, _] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(area);
+        let binding = self.time.format("%H:%M:%S%.3f");
+        let paragraph = Paragraph::new(binding.to_span()).centered();
+        frame.render_widget(paragraph, top);
         Ok(())
     }
 }
