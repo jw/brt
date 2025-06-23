@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
+use crate::components::battery::BatteryComponent;
 use crate::components::header::Header;
 use crate::{
     action::Action,
@@ -38,7 +39,11 @@ impl App {
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(FpsCounter::default()), Box::new(Header::default())],
+            components: vec![
+                Box::new(FpsCounter::default()),
+                Box::new(Header::default()),
+                Box::new(BatteryComponent::default()),
+            ],
             should_quit: false,
             should_suspend: false,
             config: Config::new()?,
