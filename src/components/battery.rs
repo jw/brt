@@ -4,17 +4,16 @@ use battery::units::power::watt;
 use battery::units::ratio::percent;
 use battery::units::time::second;
 use battery::{Battery, State};
-use color_eyre::eyre::Error;
 use color_eyre::Result;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
-use std::io;
 use std::str::FromStr;
+use tracing::{error, warn};
 
 #[derive(Debug, Default, Clone)]
 pub struct BatteryComponent<'a> {
-    line: Line<'a>,
+    pub line: Line<'a>,
 }
 
 static BATTERY_STATE_SYMBOL_UNKNOWN: &str = "?";
@@ -141,13 +140,15 @@ impl Component for BatteryComponent<'_> {
                 let manager = battery::Manager::new()?;
                 let battery = match manager.batteries()?.next() {
                     Some(Ok(battery)) => battery,
-                    Some(Err(e)) => {
-                        eprintln!("Unable to access battery information");
-                        return Err(Error::from(e));
+                    Some(Err(_)) => {
+                        error!("Unable to access battery information");
+                        self.line = Line::default();
+                        return Ok(None);
                     }
                     None => {
-                        eprintln!("Unable to find any batteries");
-                        return Err(io::Error::from(io::ErrorKind::NotFound).into());
+                        warn!("Unable to find any batteries");
+                        self.line = Line::default();
+                        return Ok(None);
                     }
                 };
                 self.line = line(battery);
@@ -156,7 +157,6 @@ impl Component for BatteryComponent<'_> {
         }
         Ok(None)
     }
-
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         frame.render_widget(Paragraph::new(self.line.clone()), area);
         Ok(())
