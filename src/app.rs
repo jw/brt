@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::components::header::Header;
+use crate::components::processes::ProcessesComponent;
 use crate::{
     action::Action,
     components::{fps::FpsCounter, Component},
@@ -41,7 +42,7 @@ impl App {
             components: vec![
                 Box::new(FpsCounter::default()),
                 Box::new(Header::default()),
-                // Box::new(BatteryComponent::default()),
+                Box::new(ProcessesComponent::default()),
             ],
             should_quit: false,
             should_suspend: false,
@@ -98,6 +99,7 @@ impl App {
             Event::Quit => action_tx.send(Action::Quit)?,
             Event::Tick => action_tx.send(Action::Tick)?,
             Event::Render => action_tx.send(Action::Render)?,
+            Event::Update(since) => action_tx.send(Action::Update(since.as_millis()))?,
             Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
             Event::Key(key) => self.handle_key_event(key)?,
             _ => {}
@@ -138,7 +140,7 @@ impl App {
     fn handle_actions(&mut self, tui: &mut Tui) -> Result<()> {
         while let Ok(action) = self.action_rx.try_recv() {
             if action != Action::Tick && action != Action::Render {
-                debug!("{action:?}");
+                debug!("Action: {action:?}");
             }
             match action {
                 Action::Tick => {
