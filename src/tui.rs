@@ -1,11 +1,5 @@
 #![allow(dead_code)] // Remove this once you start using the code
 
-use std::{
-    io::{stdout, Stdout},
-    ops::{Deref, DerefMut},
-    time::Duration,
-};
-
 use color_eyre::Result;
 use crossterm::{
     cursor,
@@ -18,6 +12,12 @@ use crossterm::{
 use futures::{FutureExt, StreamExt};
 use ratatui::backend::CrosstermBackend as Backend;
 use serde::{Deserialize, Serialize};
+use std::{
+    io::{stdout, Stdout},
+    ops::{Deref, DerefMut},
+    time::Duration,
+};
+use tokio::time::Instant;
 use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::JoinHandle,
@@ -40,6 +40,7 @@ pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
     Resize(u16, u16),
+    Update(Duration),
 }
 
 pub struct Tui {
@@ -113,11 +114,15 @@ impl Tui {
         let mut event_stream = EventStream::new();
         let mut tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
         let mut render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
+        let mut component_interval = interval(Duration::from_millis(500));
+
+        let mut last = Instant::now();
 
         // if this fails, then it's likely a bug in the calling code
         event_tx
             .send(Event::Init)
             .expect("failed to send init event");
+
         loop {
             let event = tokio::select! {
                 _ = cancellation_token.cancelled() => {
@@ -125,6 +130,13 @@ impl Tui {
                 }
                 _ = tick_interval.tick() => Event::Tick,
                 _ = render_interval.tick() => Event::Render,
+                instant = component_interval.tick() => {
+                    // info!("component instant: {:?}", instant);
+                    let event = Event::Update(instant.duration_since(last));
+                    last = Instant::now();
+                    // component_interval = interval(Duration::from_millis(1000));
+                    event
+                },
                 crossterm_event = event_stream.next().fuse() => match crossterm_event {
                     Some(Ok(event)) => match event {
                         CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => Event::Key(key),

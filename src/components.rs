@@ -12,6 +12,7 @@ pub mod battery;
 pub mod fps;
 pub mod header;
 pub mod home;
+pub mod processes;
 pub mod time;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
