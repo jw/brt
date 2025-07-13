@@ -10,6 +10,8 @@ pub enum Action {
     Resume,
     Update(u128),
     Quit,
+    Up,
+    Down,
     ClearScreen,
     Error(String),
     Help,
