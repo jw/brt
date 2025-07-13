@@ -113,8 +113,10 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
+        info!("key event: {:?}", key);
         let action_tx = self.action_tx.clone();
         let Some(keymap) = self.config.keybindings.get(&self.mode) else {
+            info!("No keybindings found");
             return Ok(());
         };
         match keymap.get(&vec![key]) {
@@ -129,7 +131,7 @@ impl App {
 
                 // Check for multi-key combinations
                 if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                    info!("Got action: {action:?}");
+                    info!("Got multikey action: {action:?}");
                     action_tx.send(action.clone())?;
                 }
             }
@@ -175,7 +177,7 @@ impl App {
                 if let Err(err) = component.draw(frame, frame.area()) {
                     let _ = self
                         .action_tx
-                        .send(Action::Error(format!("Failed to draw: {:?}", err)));
+                        .send(Action::Error(format!("Failed to draw: {err:?}")));
                 }
             }
         })?;
