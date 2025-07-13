@@ -49,6 +49,7 @@ pub struct ProcessesComponent {
     processes: Vec<BrtProcess>,
     scrollbar_state: ScrollbarState,
     state: TableState,
+    height: i64,
 }
 
 impl ProcessesComponent {
@@ -125,6 +126,8 @@ impl Component for ProcessesComponent {
             }
             Action::Up => self.jump(-1),
             Action::Down => self.jump(1),
+            Action::PageUp => self.jump(-self.height),
+            Action::PageDown => self.jump(self.height),
             Action::Update(_since) => {
                 self.processes = Vec::new();
                 for p in all_processes()?.flatten() {
@@ -145,11 +148,14 @@ impl Component for ProcessesComponent {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let [_, layout, _] = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Fill(frame.area().height - 2),
-            Constraint::Length(1),
+            Constraint::Length(1),                     // brt and battery
+            Constraint::Fill(frame.area().height - 2), // the process table
+            Constraint::Length(1),                     // debug line
         ])
         .areas(area);
+
+        // used by the PageUp and PageDown action
+        self.height = (layout.height - 4) as i64;
 
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))

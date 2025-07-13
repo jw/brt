@@ -6,7 +6,9 @@
       "<Ctrl-c>": "Quit", // Yet another way to quit
       "<Ctrl-z>": "Suspend", // Suspend the application
       "<up>": "Up",
-      "<down>": "Down"
+      "<down>": "Down",
+      "<PageUp>": "PageUp",
+      "<PageDown>": "PageDown"
     },
   }
 }
