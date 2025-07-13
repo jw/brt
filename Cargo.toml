@@ -21,7 +21,7 @@ clap = { version = "4.5.20", features = [
     "wrap_help",
     "unicode",
     "string",
-    "unstable-styles",
+    "unstable-styles",  
 ] }
 color-eyre = "0.6.3"
 config = "0.14.0"
@@ -47,6 +47,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "serde"] }
 chrono = "0.4.41"
 battery = "0.7.8"
 procfs = "0.17.0"
+uzers = "0.12.1"
 
 [build-dependencies]
 anyhow = "1.0.90"
