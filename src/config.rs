@@ -1,21 +1,25 @@
-use std::{collections::HashMap, path::PathBuf};
+#![allow(dead_code)] // Remove this once you start using the code
 
-use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use derive_deref::{Deref, DerefMut};
-use ratatui::style::{Color, Modifier, Style};
-use serde::{de::Deserializer, Deserialize};
+use std::{collections::HashMap, env, path::PathBuf};
 
 use crate::{action::Action, app::Mode};
+use color_eyre::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use derive_deref::{Deref, DerefMut};
+use directories::ProjectDirs;
+use lazy_static::lazy_static;
+use ratatui::style::{Color, Modifier, Style};
+use serde::{de::Deserializer, Deserialize};
+use tracing::error;
 
 const CONFIG: &str = include_str!("../.config/config.json5");
 
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct AppConfig {
     #[serde(default)]
-    pub _data_dir: PathBuf,
+    pub data_dir: PathBuf,
     #[serde(default)]
-    pub _config_dir: PathBuf,
+    pub config_dir: PathBuf,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -28,14 +32,26 @@ pub struct Config {
     pub styles: Styles,
 }
 
+lazy_static! {
+    pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();
+    pub static ref DATA_FOLDER: Option<PathBuf> =
+        env::var(format!("{}_DATA", PROJECT_NAME.clone()))
+            .ok()
+            .map(PathBuf::from);
+    pub static ref CONFIG_FOLDER: Option<PathBuf> =
+        env::var(format!("{}_CONFIG", PROJECT_NAME.clone()))
+            .ok()
+            .map(PathBuf::from);
+}
+
 impl Config {
     pub fn new() -> Result<Self, config::ConfigError> {
         let default_config: Config = json5::from_str(CONFIG).unwrap();
-        let data_dir = crate::utils::get_data_dir();
-        let config_dir = crate::utils::get_config_dir();
+        let data_dir = get_data_dir();
+        let config_dir = get_config_dir();
         let mut builder = config::Config::builder()
-            .set_default("_data_dir", data_dir.to_str().unwrap())?
-            .set_default("_config_dir", config_dir.to_str().unwrap())?;
+            .set_default("data_dir", data_dir.to_str().unwrap())?
+            .set_default("config_dir", config_dir.to_str().unwrap())?;
 
         let config_files = [
             ("config.json5", config::FileFormat::Json5),
@@ -46,17 +62,16 @@ impl Config {
         ];
         let mut found_config = false;
         for (file, format) in &config_files {
-            builder = builder.add_source(
-                config::File::from(config_dir.join(file))
-                    .format(*format)
-                    .required(false),
-            );
+            let source = config::File::from(config_dir.join(file))
+                .format(*format)
+                .required(false);
+            builder = builder.add_source(source);
             if config_dir.join(file).exists() {
                 found_config = true
             }
         }
         if !found_config {
-            log::error!("No configuration file found. Application may not behave as expected");
+            error!("No configuration file found. Application may not behave as expected");
         }
 
         let mut cfg: Self = builder.build()?.try_deserialize()?;
@@ -72,14 +87,38 @@ impl Config {
         for (mode, default_styles) in default_config.styles.iter() {
             let user_styles = cfg.styles.entry(*mode).or_default();
             for (style_key, style) in default_styles.iter() {
-                user_styles
-                    .entry(style_key.clone())
-                    .or_insert_with(|| *style);
+                user_styles.entry(style_key.clone()).or_insert(*style);
             }
         }
 
         Ok(cfg)
     }
+}
+
+pub fn get_data_dir() -> PathBuf {
+    let directory = if let Some(s) = DATA_FOLDER.clone() {
+        s
+    } else if let Some(proj_dirs) = project_directory() {
+        proj_dirs.data_local_dir().to_path_buf()
+    } else {
+        PathBuf::from(".").join(".data")
+    };
+    directory
+}
+
+pub fn get_config_dir() -> PathBuf {
+    let directory = if let Some(s) = CONFIG_FOLDER.clone() {
+        s
+    } else if let Some(proj_dirs) = project_directory() {
+        proj_dirs.config_local_dir().to_path_buf()
+    } else {
+        PathBuf::from(".").join(".config")
+    };
+    directory
+}
+
+fn project_directory() -> Option<ProjectDirs> {
+    ProjectDirs::from("com", "kdheepak", env!("CARGO_PKG_NAME"))
 }
 
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
@@ -253,7 +292,7 @@ pub fn key_event_to_string(key_event: &KeyEvent) -> String {
 
 pub fn parse_key_sequence(raw: &str) -> Result<Vec<KeyEvent>, String> {
     if raw.chars().filter(|c| *c == '>').count() != raw.chars().filter(|c| *c == '<').count() {
-        return Err(format!("Unable to parse `{}`", raw));
+        return Err(format!("Unable to parse `{raw}`"));
     }
     let raw = if !raw.contains("><") {
         let raw = raw.strip_prefix('<').unwrap_or(raw);
@@ -450,7 +489,7 @@ mod tests {
     #[test]
     fn test_parse_color_rgb() {
         let color = parse_color("rgb123");
-        let expected = 67;
+        let expected = 16 + 36 + 2 * 6 + 3;
         assert_eq!(color, Some(Color::Indexed(expected)));
     }
 
@@ -465,7 +504,7 @@ mod tests {
         let c = Config::new()?;
         assert_eq!(
             c.keybindings
-                .get(&Mode::Process)
+                .get(&Mode::Home)
                 .unwrap()
                 .get(&parse_key_sequence("<q>").unwrap_or_default())
                 .unwrap(),

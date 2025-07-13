@@ -1,30 +1,18 @@
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Display, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
 pub enum Action {
     Tick,
     Render,
     Resize(u16, u16),
     Suspend,
     Resume,
+    Update(u128),
     Quit,
-    Refresh,
-    Error(String),
-    Help,
-    ToggleShowHelp,
-    Increment(usize),
-    Decrement(usize),
-    CompleteInput(String),
-    EnterNormal,
-    EnterInsert,
-    EnterProcessing,
-    ExitProcessing,
     Up,
     Down,
-    PageUp,
-    PageDown,
-    Left,
-    Right,
-    Update,
+    ClearScreen,
+    Error(String),
+    Help,
 }
