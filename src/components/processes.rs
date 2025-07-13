@@ -1,6 +1,7 @@
 use super::Component;
 use crate::action::Action;
 use color_eyre::Result;
+use humansize::{format_size, FormatSizeOptions, BINARY};
 use procfs::process::{all_processes, Process};
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
@@ -56,7 +57,7 @@ impl TryFrom<Process> for BrtProcess {
                 command: get_cmdline_as_string(&process),
                 number_of_threads: stat.num_threads,
                 user: get_uid_as_string(&process),
-                resident_memory: 0,
+                resident_memory: get_memory(&process),
                 cpus: Default::default(),
                 cpu_graph: "foo".to_string(),
                 cpu: 0.0,
@@ -64,6 +65,15 @@ impl TryFrom<Process> for BrtProcess {
         } else {
             Err(())
         }
+    }
+}
+
+pub fn get_memory(process: &Process) -> u64 {
+    if let Ok(statm) = process.statm() {
+        let page_size = procfs::page_size();
+        statm.resident * page_size
+    } else {
+        0
     }
 }
 
@@ -105,10 +115,10 @@ impl ProcessesComponent {
 pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
     let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
 
-    // let humansize_options: FormatSizeOptions = FormatSizeOptions::from(BINARY)
-    //     .space_after_value(false)
-    //     .decimal_places(1)
-    //     .decimal_zeroes(0);
+    let humansize_options: FormatSizeOptions = FormatSizeOptions::from(BINARY)
+        .space_after_value(false)
+        .decimal_places(1)
+        .decimal_zeroes(0);
 
     Row::new([
         Cell::new(Line::from(process.pid.to_string()).alignment(Alignment::Right)),
@@ -121,8 +131,9 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
         ),
         Cell::new(Line::from(process.user.to_string())),
         Cell::new(
-            Line::from("format_size(process.resident_memory, humansize_options)")
-                .style(special_style),
+            Line::from(format_size(process.resident_memory, humansize_options))
+                .style(special_style)
+                .alignment(Alignment::Right),
         ),
         Cell::new(Line::from("process.cpu_graph.to_string()")),
         Cell::new(format!("{:.2}", process.cpu)).style(special_style),
@@ -227,7 +238,7 @@ impl Component for ProcessesComponent {
             Constraint::Fill(1),
             Constraint::Percentage(5),
             Constraint::Percentage(5),
-            Constraint::Length(5),
+            Constraint::Length(7),
             Constraint::Length(5),
             Constraint::Length(5),
         ];
