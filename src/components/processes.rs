@@ -7,6 +7,7 @@ use ratatui::prelude::Constraint::{Fill, Length, Percentage};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
 use ratatui::widgets::{
     Block, BorderType, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+    TableState,
 };
 use ratatui::Frame;
 use std::collections::VecDeque;
@@ -47,6 +48,27 @@ impl From<Stat> for BrtProcess {
 #[derive(Default)]
 pub struct ProcessesComponent {
     processes: Vec<BrtProcess>,
+    scrollbar_state: ScrollbarState,
+    state: TableState,
+}
+
+impl ProcessesComponent {
+    pub fn jump(&mut self, steps: i64) {
+        let location = self.state.selected().unwrap_or(0) as i64;
+        let length = self.processes.len() as i64;
+        info!(
+            "Move {} steps in [{}..{}] when current location is {}.",
+            steps, 0, length, location
+        );
+        let mut index = location + steps;
+        while index < 0 {
+            index += length;
+        }
+        let new_location = (index % length) as usize;
+        info!("New location is {}.", new_location);
+        self.state.select(Some(new_location));
+        self.scrollbar_state = self.scrollbar_state.position(new_location);
+    }
 }
 
 pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
@@ -102,6 +124,8 @@ impl Component for ProcessesComponent {
             Action::Render => {
                 // add any logic here that should run on every render
             }
+            Action::Up => self.jump(-1),
+            Action::Down => self.jump(1),
             Action::Update(since) => {
                 // info!("!!! Update at ({})", since);
                 self.processes = Vec::new();
@@ -111,6 +135,10 @@ impl Component for ProcessesComponent {
                     }
                 }
                 info!("[update|{}] processes len: {}", since, self.processes.len());
+                self.scrollbar_state = self.scrollbar_state.content_length(self.processes.len());
+                if self.state.selected().is_none() {
+                    self.state.select(Some(0));
+                }
             }
             _ => {}
         }
@@ -131,12 +159,9 @@ impl Component for ProcessesComponent {
             .track_symbol(Some(" "))
             .style(Color::White);
 
-        let selected_style = Style::default()
+        let selected_row_style = Style::default()
             .bg(Color::Rgb(0xd4, 0x54, 0x54))
-            .fg(Color::White)
             .add_modifier(Modifier::BOLD);
-
-        let rows = create_rows(&self.processes);
 
         let header = [
             Cell::new(Line::from("Pid:").alignment(Alignment::Right)),
@@ -152,14 +177,19 @@ impl Component for ProcessesComponent {
         .cloned()
         .collect::<Row>()
         .height(1)
-        .style(Style::default().bold());
+        .style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .fg(Color::White),
+        );
 
+        let rows = create_rows(&self.processes);
         let processes = self.processes.len();
+        let process = format!("{}/{}", self.state.selected().unwrap_or(0) + 1, processes);
 
         let block = Block::default()
             .title_top(Line::from("proc").alignment(Alignment::Left))
-            // .title_top(Line::from(self.order_string()).alignment(Alignment::Right))
-            .title_bottom(Line::from(processes.to_string()).alignment(Alignment::Right))
+            .title_bottom(Line::from(process.to_string()).alignment(Alignment::Right))
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::White))
             .border_type(BorderType::Rounded);
@@ -178,18 +208,16 @@ impl Component for ProcessesComponent {
         let table = Table::new(rows, widths)
             .block(block)
             .header(header)
-            .row_highlight_style(selected_style);
+            .row_highlight_style(selected_row_style);
 
-        let mut scrollbar_state = ScrollbarState::new(self.processes.len()).position(4);
-
-        frame.render_widget(table, layout);
+        frame.render_stateful_widget(table, layout, &mut self.state);
         frame.render_stateful_widget(
             scrollbar,
             layout.inner(Margin {
                 vertical: 1,
                 horizontal: 1,
             }),
-            &mut scrollbar_state,
+            &mut self.scrollbar_state,
         );
 
         Ok(())
