@@ -1,7 +1,7 @@
 use super::Component;
 use crate::action::Action;
 use color_eyre::Result;
-use procfs::process::{all_processes, Stat};
+use procfs::process::{all_processes, Process};
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
 use ratatui::widgets::{
@@ -11,6 +11,7 @@ use ratatui::widgets::{
 use ratatui::Frame;
 use std::collections::VecDeque;
 use tracing::info;
+use uzers::get_user_by_uid;
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
@@ -20,26 +21,48 @@ pub struct BrtProcess {
     pub program: String,
     pub command: String,
     pub number_of_threads: i64,
-    pub user: Option<String>,
+    pub user: String,
     pub resident_memory: u64,
     pub cpus: VecDeque<f64>,
     pub cpu_graph: String,
     pub cpu: f64,
 }
 
-impl From<Stat> for BrtProcess {
-    fn from(stat: Stat) -> Self {
-        BrtProcess {
-            pid: stat.pid,
-            ppid: stat.ppid,
-            program: stat.comm,
-            command: "".to_string(),
-            number_of_threads: stat.cguest_time.unwrap(),
-            user: None,
-            resident_memory: 0,
-            cpus: Default::default(),
-            cpu_graph: "foo".to_string(),
-            cpu: 0.0,
+fn get_uid_as_string(process: Process) -> String {
+    match process.uid() {
+        Ok(uid) => {
+            if let Some(user) = get_user_by_uid(uid) {
+                if let Some(user) = user.name().to_str() {
+                    user.to_string()
+                } else {
+                    "<unknown>".to_string()
+                }
+            } else {
+                "<unknown>".to_string()
+            }
+        }
+        Err(_) => "<unknown>".to_string(),
+    }
+}
+
+impl TryFrom<Process> for BrtProcess {
+    type Error = ();
+    fn try_from(process: Process) -> Result<Self, Self::Error> {
+        if let Ok(stat) = process.stat() {
+            Ok(Self {
+                pid: stat.pid,
+                ppid: stat.ppid,
+                program: stat.comm,
+                command: "".to_string(),
+                number_of_threads: stat.cguest_time.unwrap(),
+                user: get_uid_as_string(process),
+                resident_memory: 0,
+                cpus: Default::default(),
+                cpu_graph: "foo".to_string(),
+                cpu: 0.0,
+            })
+        } else {
+            Err(())
         }
     }
 }
@@ -96,7 +119,7 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
                 .alignment(Alignment::Right)
                 .style(special_style),
         ),
-        Cell::new(Line::from("username")),
+        Cell::new(Line::from(process.user.to_string())),
         Cell::new(
             Line::from("format_size(process.resident_memory, humansize_options)")
                 .style(special_style),
@@ -131,8 +154,8 @@ impl Component for ProcessesComponent {
             Action::Update(_since) => {
                 self.processes = Vec::new();
                 for p in all_processes()?.flatten() {
-                    if let Ok(stat) = p.stat() {
-                        self.processes.push(BrtProcess::from(stat));
+                    if let Ok(process) = BrtProcess::try_from(p) {
+                        self.processes.push(process);
                     }
                 }
                 info!("Updated {} processes.", self.processes.len());
