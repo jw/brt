@@ -28,7 +28,7 @@ pub struct BrtProcess {
     pub cpu: f64,
 }
 
-fn get_uid_as_string(process: Process) -> String {
+fn get_uid_as_string(process: &Process) -> String {
     match process.uid() {
         Ok(uid) => {
             if let Some(user) = get_user_by_uid(uid) {
@@ -53,9 +53,9 @@ impl TryFrom<Process> for BrtProcess {
                 pid: stat.pid,
                 ppid: stat.ppid,
                 program: stat.comm,
-                command: "".to_string(),
+                command: get_cmdline_as_string(&process),
                 number_of_threads: stat.num_threads,
-                user: get_uid_as_string(process),
+                user: get_uid_as_string(&process),
                 resident_memory: 0,
                 cpus: Default::default(),
                 cpu_graph: "foo".to_string(),
@@ -64,6 +64,14 @@ impl TryFrom<Process> for BrtProcess {
         } else {
             Err(())
         }
+    }
+}
+
+fn get_cmdline_as_string(process: &Process) -> String {
+    if let Ok(cmdline) = process.cmdline() {
+        cmdline.join(" ")
+    } else {
+        "<zombie>".to_string()
     }
 }
 
