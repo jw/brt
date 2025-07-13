@@ -3,7 +3,6 @@ use crate::action::Action;
 use color_eyre::Result;
 use procfs::process::{all_processes, Stat};
 use ratatui::layout::{Constraint, Layout, Margin, Rect};
-use ratatui::prelude::Constraint::{Fill, Length, Percentage};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
 use ratatui::widgets::{
     Block, BorderType, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
@@ -126,15 +125,14 @@ impl Component for ProcessesComponent {
             }
             Action::Up => self.jump(-1),
             Action::Down => self.jump(1),
-            Action::Update(since) => {
-                // info!("!!! Update at ({})", since);
+            Action::Update(_since) => {
                 self.processes = Vec::new();
                 for p in all_processes()?.flatten() {
                     if let Ok(stat) = p.stat() {
                         self.processes.push(BrtProcess::from(stat));
                     }
                 }
-                info!("[update|{}] processes len: {}", since, self.processes.len());
+                info!("Updated {} processes.", self.processes.len());
                 self.scrollbar_state = self.scrollbar_state.content_length(self.processes.len());
                 if self.state.selected().is_none() {
                     self.state.select(Some(0));
@@ -195,14 +193,14 @@ impl Component for ProcessesComponent {
             .border_type(BorderType::Rounded);
 
         let widths = [
-            Percentage(5),
-            Percentage(15),
-            Fill(1),
-            Percentage(5),
-            Percentage(5),
-            Length(5),
-            Length(5),
-            Length(5),
+            Constraint::Percentage(5),
+            Constraint::Percentage(15),
+            Constraint::Fill(1),
+            Constraint::Percentage(5),
+            Constraint::Percentage(5),
+            Constraint::Length(5),
+            Constraint::Length(5),
+            Constraint::Length(5),
         ];
 
         let table = Table::new(rows, widths)
