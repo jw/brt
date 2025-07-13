@@ -103,14 +103,6 @@ impl ProcessesComponent {
 }
 
 pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
-    // let user = process.user.clone();
-    // let username = if user.is_some() {
-    //     #[allow(clippy::unnecessary_unwrap)]
-    //     user.unwrap().name().to_os_string().into_string().unwrap()
-    // } else {
-    //     "unknown".to_string()
-    // };
-
     let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
 
     // let humansize_options: FormatSizeOptions = FormatSizeOptions::from(BINARY)
