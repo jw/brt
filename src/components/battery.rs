@@ -47,14 +47,14 @@ fn line<'a>(battery: Battery) -> Line<'a> {
     if let Some(time_to_empty) = battery.time_to_empty() {
         let seconds_to_empty = time_to_empty.get::<second>() as i64;
         let (hours, minutes) = seconds_to_hours_minutes(seconds_to_empty);
-        let time_to_empty = Span::raw(format!(" {:02}:{:02}", hours, minutes));
+        let time_to_empty = Span::raw(format!(" {hours:02}:{minutes:02}"));
         parts.push(time_to_empty);
     }
 
     if let Some(time_to_full) = battery.time_to_full() {
         let seconds_to_full = time_to_full.get::<second>() as i64;
         let (hours, minutes) = seconds_to_hours_minutes(seconds_to_full);
-        let time_to_full = Span::raw(format!(" {:02}:{:02}", hours, minutes));
+        let time_to_full = Span::raw(format!(" {hours:02}:{minutes:02}"));
         parts.push(time_to_full);
     }
 
