@@ -36,7 +36,7 @@ impl Component for Header<'_> {
         ])
         .areas(area);
 
-        let binding = self.time.format("brt");
+        let binding = format!("brt {}", env!("CARGO_PKG_VERSION"));
         let paragraph = Paragraph::new(binding.to_span()).left_aligned();
         frame.render_widget(paragraph, left);
 
