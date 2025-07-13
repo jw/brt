@@ -12,6 +12,8 @@ pub enum Action {
     Quit,
     Up,
     Down,
+    PageUp,
+    PageDown,
     ClearScreen,
     Error(String),
     Help,
