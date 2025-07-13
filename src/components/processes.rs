@@ -54,7 +54,7 @@ impl TryFrom<Process> for BrtProcess {
                 ppid: stat.ppid,
                 program: stat.comm,
                 command: "".to_string(),
-                number_of_threads: stat.cguest_time.unwrap(),
+                number_of_threads: stat.num_threads,
                 user: get_uid_as_string(process),
                 resident_memory: 0,
                 cpus: Default::default(),
