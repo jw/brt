@@ -1,11 +1,10 @@
+use super::Component;
+use crate::action::Action;
+use crate::components::battery::BatteryComponent;
 use chrono::{DateTime, Local};
 use color_eyre::Result;
 use ratatui::text::ToSpan;
 use ratatui::{prelude::*, widgets::*};
-
-use super::Component;
-use crate::action::Action;
-use crate::components::battery::BatteryComponent;
 
 #[derive(Default)]
 pub struct Header<'a> {
