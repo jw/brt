@@ -1,14 +1,14 @@
 use super::Component;
 use crate::action::Action;
 use crate::components::fps::FpsCounter;
+use crate::components::uptime::UptimeWidget;
 use color_eyre::Result;
-use ratatui::text::ToSpan;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::prelude::*;
 
 #[derive(Default)]
 pub struct Footer<'a> {
     fps: FpsCounter<'a>,
-    _up: Line<'a>,
+    up: UptimeWidget<'a>,
 }
 
 impl Component for Footer<'_> {
@@ -19,6 +19,7 @@ impl Component for Footer<'_> {
             }
             Action::Render => {
                 let _ = self.fps.update(Action::Render);
+                let _ = self.up.update(Action::Render);
             }
             _ => {}
         }
@@ -36,7 +37,7 @@ impl Component for Footer<'_> {
         ])
         .areas(bottom);
 
-        let paragraph = Paragraph::new("up".to_span()).left_aligned();
+        let paragraph = self.up.widget.clone().left_aligned();
         frame.render_widget(paragraph, left);
 
         let paragraph = self.fps.widget.clone().right_aligned();
