@@ -2,7 +2,7 @@ name: brt
 
 on:
   push:
-    branches: [ "ci" ]  # "main"
+    branches: [ "main" ]  # "ci"
   pull_request:
     branches: [ "main" ]
 
