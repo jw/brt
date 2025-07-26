@@ -1,6 +1,6 @@
 [package]
 name = "brt"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Jan Willems <jw@elevenbits.com>"]
 keywords = ["terminal", "btop"]
 repository = "https://github.com/jw/brt"
@@ -8,14 +8,14 @@ readme = "README.md"
 edition = "2021"
 description = "btop in rust"
 license = "EUPL-1.2"
-rust-version = "1.85.1"
+rust-version = "1.88.0"
 
 [[bin]]
 name = "brt"
 
 [dependencies]
 better-panic = "0.3.0"
-clap = { version = "4.5.20", features = [
+clap = { version = "4.5.41", features = [
     "derive",
     "cargo",
     "wrap_help",
