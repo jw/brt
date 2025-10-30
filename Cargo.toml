@@ -49,6 +49,8 @@ battery = "0.7.8"
 procfs = "0.17.0"
 uzers = "0.12.1"
 humansize = "2.1.3"
+allow = "0.1.5"
+clippy = "0.0.302"
 
 [build-dependencies]
 anyhow = "1.0.98"
