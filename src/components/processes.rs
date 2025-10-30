@@ -2,8 +2,8 @@ use super::Component;
 use crate::action::Action;
 use color_eyre::Result;
 use humansize::{format_size, FormatSizeOptions, BINARY};
-use procfs::process::{all_processes, Process};
-use ratatui::layout::{Constraint, Layout, Margin, Rect};
+use procfs::process::{all_processes, Process, Stat};
+use ratatui::layout::{Constraint, Layout, Margin, Rect, Size};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
 use ratatui::widgets::{
     Block, BorderType, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
@@ -11,6 +11,9 @@ use ratatui::widgets::{
 };
 use ratatui::Frame;
 use std::collections::VecDeque;
+use std::sync::mpsc as std_mpsc;
+use std::sync::mpsc::{Receiver as ThreadReceiver, Sender as ThreadSender};
+use std::thread;
 use tracing::info;
 use uzers::get_user_by_uid;
 
@@ -27,6 +30,8 @@ pub struct BrtProcess {
     pub cpus: VecDeque<f64>,
     pub cpu_graph: String,
     pub cpu: f64,
+    pub stat: Option<Stat>,
+    pub cmdline: Option<Vec<String>>,
 }
 
 fn get_uid_as_string(process: &Process) -> String {
@@ -50,6 +55,7 @@ impl TryFrom<Process> for BrtProcess {
     type Error = ();
     fn try_from(process: Process) -> Result<Self, Self::Error> {
         if let Ok(stat) = process.stat() {
+            let new_stat = stat.clone();
             Ok(Self {
                 pid: stat.pid,
                 ppid: stat.ppid,
@@ -61,6 +67,8 @@ impl TryFrom<Process> for BrtProcess {
                 cpus: Default::default(),
                 cpu_graph: "foo".to_string(),
                 cpu: 0.0,
+                stat: Some(new_stat),
+                cmdline: None,
             })
         } else {
             Err(())
@@ -91,6 +99,7 @@ pub struct ProcessesComponent {
     scrollbar_state: ScrollbarState,
     state: TableState,
     height: i64,
+    rx: Option<ThreadReceiver<Vec<BrtProcess>>>,
 }
 
 impl ProcessesComponent {
@@ -140,7 +149,7 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
     ])
 }
 
-pub fn create_rows(processes: &Vec<BrtProcess>) -> Vec<Row> {
+pub fn create_rows(processes: &Vec<BrtProcess>) -> Vec<Row<'_>> {
     let mut rows = Vec::new();
     for process in processes {
         let row = create_row(process);
@@ -149,7 +158,39 @@ pub fn create_rows(processes: &Vec<BrtProcess>) -> Vec<Row> {
     rows
 }
 
+pub fn get_all_processes() -> Vec<BrtProcess> {
+    info!("Getting all processes...");
+    let mut processes = Vec::new();
+    for p in all_processes().expect("Could not get processes").flatten() {
+        if let Ok(process) = BrtProcess::try_from(p) {
+            processes.push(process);
+        }
+    }
+    info!("{} processes found.", processes.len());
+    processes
+}
+
+fn processes_thread(thread_tx: ThreadSender<Vec<BrtProcess>>) {
+    loop {
+        // TODO(jw): Add timing
+        let processes = get_all_processes();
+        thread_tx.send(processes).unwrap();
+    }
+}
+
 impl Component for ProcessesComponent {
+    fn init(&mut self, _area: Size) -> Result<()> {
+        info!("ProcessesComponent::init start");
+        let (thread_tx, thread_rx) = std_mpsc::channel();
+        self.rx = Some(thread_rx);
+
+        let _ = thread::spawn(move || {
+            processes_thread(thread_tx);
+        });
+        info!("ProcessesComponent::init end");
+        Ok(())
+    }
+
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
@@ -163,16 +204,24 @@ impl Component for ProcessesComponent {
             Action::PageUp => self.jump(-self.height),
             Action::PageDown => self.jump(self.height),
             Action::Update(_since) => {
-                self.processes = Vec::new();
-                for p in all_processes()?.flatten() {
-                    if let Ok(process) = BrtProcess::try_from(p) {
-                        self.processes.push(process);
+                if let Some(rx) = self.rx.as_mut() {
+                    let mut latest: Option<Vec<BrtProcess>> = None;
+                    #[allow(clippy::while_let_loop)]
+                    loop {
+                        match rx.try_recv() {
+                            Ok(v) => latest = Some(v),
+                            Err(_) => break,
+                        }
                     }
-                }
-                info!("Updated {} processes.", self.processes.len());
-                self.scrollbar_state = self.scrollbar_state.content_length(self.processes.len());
-                if self.state.selected().is_none() {
-                    self.state.select(Some(0));
+                    if let Some(processes) = latest {
+                        self.processes = processes;
+                        info!("Updated {} processes.", self.processes.len());
+                        self.scrollbar_state =
+                            self.scrollbar_state.content_length(self.processes.len());
+                        if self.state.selected().is_none() && !self.processes.is_empty() {
+                            self.state.select(Some(0));
+                        }
+                    }
                 }
             }
             _ => {}

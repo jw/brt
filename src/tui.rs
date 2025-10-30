@@ -114,7 +114,7 @@ impl Tui {
         let mut event_stream = EventStream::new();
         let mut tick_interval = interval(Duration::from_secs_f64(1.0 / tick_rate));
         let mut render_interval = interval(Duration::from_secs_f64(1.0 / frame_rate));
-        let mut component_interval = interval(Duration::from_millis(500));
+        let mut component_interval = interval(Duration::from_millis(200));
 
         let mut last = Instant::now();
 
