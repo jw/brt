@@ -2,7 +2,7 @@ use super::Component;
 use crate::action::Action;
 use color_eyre::Result;
 use humansize::{format_size, FormatSizeOptions, BINARY};
-use procfs::process::{all_processes, Process, Stat};
+use procfs::process::{all_processes, Process};
 use ratatui::layout::{Constraint, Layout, Margin, Rect, Size};
 use ratatui::prelude::{Alignment, Color, Line, Modifier, Style};
 use ratatui::widgets::{
@@ -30,8 +30,6 @@ pub struct BrtProcess {
     pub cpus: VecDeque<f64>,
     pub cpu_graph: String,
     pub cpu: f64,
-    pub stat: Option<Stat>,
-    pub cmdline: Option<Vec<String>>,
 }
 
 fn get_uid_as_string(process: &Process) -> String {
@@ -55,7 +53,6 @@ impl TryFrom<Process> for BrtProcess {
     type Error = ();
     fn try_from(process: Process) -> Result<Self, Self::Error> {
         if let Ok(stat) = process.stat() {
-            let new_stat = stat.clone();
             Ok(Self {
                 pid: stat.pid,
                 ppid: stat.ppid,
@@ -67,8 +64,6 @@ impl TryFrom<Process> for BrtProcess {
                 cpus: Default::default(),
                 cpu_graph: "foo".to_string(),
                 cpu: 0.0,
-                stat: Some(new_stat),
-                cmdline: None,
             })
         } else {
             Err(())
