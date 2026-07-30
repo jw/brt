@@ -58,3 +58,6 @@ vergen-gix = { version = "10", features = ["build", "cargo"] }
 version = "1"
 #default-features = false
 features = ["precommit-hook"]
+
+[package.metadata.semantic_release]
+tag_format = "{version}"
