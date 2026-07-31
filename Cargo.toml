@@ -1,6 +1,6 @@
 [package]
 name = "brt"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Jan Willems <jw@elevenbits.com>"]
 keywords = ["terminal", "btop"]
 repository = "https://github.com/jw/brt"
@@ -58,3 +58,6 @@ vergen-gix = { version = "10", features = ["build", "cargo"] }
 version = "1"
 #default-features = false
 features = ["precommit-hook"]
+
+[package.metadata.semantic_release]
+tag_format = "{version}"
