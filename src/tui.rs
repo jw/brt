@@ -159,20 +159,9 @@ impl Tui {
         cancellation_token.cancel();
     }
 
-    pub fn stop(&self) -> Result<()> {
+    pub async fn stop(&mut self) -> Result<()> {
         self.cancel();
-        let mut counter = 0;
-        while !self.task.is_finished() {
-            std::thread::sleep(Duration::from_millis(1));
-            counter += 1;
-            if counter > 50 {
-                self.task.abort();
-            }
-            if counter > 100 {
-                error!("Failed to abort task in 100 milliseconds for unknown reason");
-                break;
-            }
-        }
+        wait_for_task(&mut self.task).await;
         Ok(())
     }
 
@@ -189,8 +178,16 @@ impl Tui {
         Ok(())
     }
 
-    pub fn exit(&mut self) -> Result<()> {
-        self.stop()?;
+    pub async fn exit(&mut self) -> Result<()> {
+        self.stop().await?;
+        self.restore_terminal()
+    }
+
+    /// Restores the terminal to its normal mode, without waiting for the
+    /// background event task to finish. Used by [`exit`](Self::exit) on the
+    /// normal shutdown path, and directly by callers (panic hook, `Drop`)
+    /// that can't await the graceful [`stop`](Self::stop).
+    pub fn restore_terminal(&mut self) -> Result<()> {
         if crossterm::terminal::is_raw_mode_enabled()? {
             self.flush()?;
             if self.paste {
@@ -209,8 +206,8 @@ impl Tui {
         self.cancellation_token.cancel();
     }
 
-    pub fn suspend(&mut self) -> Result<()> {
-        self.exit()?;
+    pub async fn suspend(&mut self) -> Result<()> {
+        self.exit().await?;
         #[cfg(not(windows))]
         signal_hook::low_level::raise(signal_hook::consts::signal::SIGTSTP)?;
         Ok(())
@@ -223,6 +220,19 @@ impl Tui {
 
     pub async fn next_event(&mut self) -> Option<Event> {
         self.event_rx.recv().await
+    }
+}
+
+async fn wait_for_task(task: &mut JoinHandle<()>) {
+    if task.is_finished() {
+        return;
+    }
+    if tokio::time::timeout(Duration::from_millis(100), &mut *task)
+        .await
+        .is_err()
+    {
+        task.abort();
+        error!("Failed to abort task in 100 milliseconds for unknown reason");
     }
 }
 
@@ -242,6 +252,36 @@ impl DerefMut for Tui {
 
 impl Drop for Tui {
     fn drop(&mut self) {
-        self.exit().unwrap();
+        self.cancel();
+        self.restore_terminal().unwrap();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn wait_for_task_does_not_busy_wait_the_executor() {
+        let mut task = tokio::spawn(async {});
+
+        let started = std::time::Instant::now();
+        wait_for_task(&mut task).await;
+        let elapsed = started.elapsed();
+
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "wait_for_task took {elapsed:?}, which suggests it busy-waits on a real-time \
+             sleep instead of awaiting the task"
+        );
+    }
+
+    #[tokio::test]
+    async fn wait_for_task_is_safe_to_call_again_on_an_already_finished_task() {
+        let mut task = tokio::spawn(async {});
+
+        wait_for_task(&mut task).await;
+        // Mirrors Tui::stop being called explicitly and then again via Tui::exit.
+        wait_for_task(&mut task).await;
     }
 }

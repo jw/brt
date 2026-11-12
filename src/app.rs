@@ -77,17 +77,17 @@ impl App {
             self.handle_events(&mut tui).await?;
             self.handle_actions(&mut tui)?;
             if self.should_suspend {
-                tui.suspend()?;
+                tui.suspend().await?;
                 action_tx.send(Action::Resume)?;
                 action_tx.send(Action::ClearScreen)?;
                 // tui.mouse(true);
                 tui.enter()?;
             } else if self.should_quit {
-                tui.stop()?;
+                tui.stop().await?;
                 break;
             }
         }
-        tui.exit()?;
+        tui.exit().await?;
         Ok(())
     }
 

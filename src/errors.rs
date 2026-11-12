@@ -16,7 +16,7 @@ pub fn init() -> Result<()> {
     eyre_hook.install()?;
     std::panic::set_hook(Box::new(move |panic_info| {
         if let Ok(mut t) = crate::tui::Tui::new() {
-            if let Err(r) = t.exit() {
+            if let Err(r) = t.restore_terminal() {
                 error!("Unable to exit Terminal: {:?}", r);
             }
         }
