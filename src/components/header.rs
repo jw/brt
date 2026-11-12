@@ -17,10 +17,9 @@ impl Component for Header<'_> {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
-                // add any logic here that should run on every tick
+                let _ = self.battery.update(Action::Tick);
             }
             Action::Render => {
-                let _ = self.battery.update(Action::Render);
                 self.time = Local::now();
             }
             _ => {}

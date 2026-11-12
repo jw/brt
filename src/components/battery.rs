@@ -14,6 +14,7 @@ use tracing::{error, warn};
 #[derive(Debug, Default, Clone)]
 pub struct BatteryComponent<'a> {
     pub line: Line<'a>,
+    refresh_attempts: u32,
 }
 
 static BATTERY_STATE_SYMBOL_UNKNOWN: &str = "?";
@@ -134,9 +135,7 @@ impl Component for BatteryComponent<'_> {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
-                // add any logic here that should run on every tick
-            }
-            Action::Render => {
+                self.refresh_attempts += 1;
                 let manager = battery::Manager::new()?;
                 let battery = match manager.batteries()?.next() {
                     Some(Ok(battery)) => battery,
@@ -153,6 +152,9 @@ impl Component for BatteryComponent<'_> {
                 };
                 self.line = line(battery);
             }
+            Action::Render => {
+                // add any logic here that should run on every render
+            }
             _ => {}
         }
         Ok(None)
@@ -160,5 +162,27 @@ impl Component for BatteryComponent<'_> {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         frame.render_widget(Paragraph::new(self.line.clone()), area);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refreshes_on_tick_rather_than_on_render() {
+        let mut battery = BatteryComponent::default();
+
+        battery.update(Action::Render).unwrap();
+        assert_eq!(
+            battery.refresh_attempts, 0,
+            "Render should not query battery hardware"
+        );
+
+        battery.update(Action::Tick).unwrap();
+        assert_eq!(
+            battery.refresh_attempts, 1,
+            "Tick should query battery hardware"
+        );
     }
 }
