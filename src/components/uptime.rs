@@ -65,9 +65,6 @@ impl Component for UptimeWidget<'_> {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Tick => {
-                // add any logic here that should run on every tick
-            }
-            Action::Render => {
                 let f = File::open("/proc/uptime");
                 if let Ok(f) = f {
                     let f = BufReader::new(f);
@@ -76,6 +73,9 @@ impl Component for UptimeWidget<'_> {
                         self.widget = widget(self);
                     };
                 }
+            }
+            Action::Render => {
+                // add any logic here that should run on every render
             }
             _ => {}
         }
@@ -133,6 +133,24 @@ mod tests {
         assert_eq!(
             result,
             "1 month, 3 weeks, 2 days, 0 hours, 1 minute, 30 seconds",
+        );
+    }
+
+    #[test]
+    fn refreshes_on_tick_rather_than_on_render() {
+        let mut widget = UptimeWidget::default();
+
+        widget.update(Action::Render).unwrap();
+        assert_eq!(
+            widget.duration,
+            Duration::default(),
+            "Render should not read /proc/uptime"
+        );
+
+        widget.update(Action::Tick).unwrap();
+        assert!(
+            widget.duration > Duration::default(),
+            "Tick should read /proc/uptime"
         );
     }
 }

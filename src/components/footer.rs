@@ -16,10 +16,10 @@ impl Component for Footer<'_> {
         match action {
             Action::Tick => {
                 let _ = self.fps.update(Action::Tick);
+                let _ = self.up.update(Action::Tick);
             }
             Action::Render => {
                 let _ = self.fps.update(Action::Render);
-                let _ = self.up.update(Action::Render);
             }
             _ => {}
         }
