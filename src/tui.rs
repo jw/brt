@@ -253,7 +253,9 @@ impl DerefMut for Tui {
 impl Drop for Tui {
     fn drop(&mut self) {
         self.cancel();
-        self.restore_terminal().unwrap();
+        if let Err(err) = self.restore_terminal() {
+            error!("Unable to exit Terminal: {:?}", err);
+        }
     }
 }
 
