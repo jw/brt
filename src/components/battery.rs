@@ -71,64 +71,22 @@ fn seconds_to_hours_minutes(seconds: i64) -> (i64, i64) {
     (hours, minutes)
 }
 
+const BAR_COLORS: [&str; 10] = [
+    "#d86453", "#d57b59", "#d19260", "#cea966", "#cbc06c", "#bac276", "#a9c47f", "#98c689",
+    "#87c892", "#77ca9b",
+];
+const BAR_EMPTY_COLOR: &str = "#404040";
+
 fn bar(percentage: f32) -> Vec<Span<'static>> {
-    let block_0 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#d86453").unwrap()),
-    );
-    let block_1 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#d57b59").unwrap()),
-    );
-    let block_2 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#d19260").unwrap()),
-    );
-    let block_3 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#cea966").unwrap()),
-    );
-    let block_4 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#cbc06c").unwrap()),
-    );
-    let block_5 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#bac276").unwrap()),
-    );
-    let block_6 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#a9c47f").unwrap()),
-    );
-    let block_7 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#98c689").unwrap()),
-    );
-    let block_8 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#87c892").unwrap()),
-    );
-    let block_9 = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#77ca9b").unwrap()),
-    );
-    let blocks = vec![
-        block_0, block_1, block_2, block_3, block_4, block_5, block_6, block_7, block_8, block_9,
-    ];
-
-    let style_empty = Span::styled(
-        "■",
-        Style::default().fg(Color::from_str("#404040").unwrap()),
-    );
-    let empty_bar = vec![style_empty; 10];
-
     let until = ((percentage / 10.0) as usize).min(10);
-    let filled = &blocks[..until].to_vec();
-    let emptied = &empty_bar[until..10].to_vec();
-    let mut bar = vec![];
-    bar.append(&mut filled.clone());
-    bar.append(&mut emptied.clone());
-    bar
+    BAR_COLORS
+        .iter()
+        .enumerate()
+        .map(|(i, color)| {
+            let color = if i < until { color } else { BAR_EMPTY_COLOR };
+            Span::styled("■", Style::default().fg(Color::from_str(color).unwrap()))
+        })
+        .collect()
 }
 
 impl Component for BatteryComponent<'_> {
