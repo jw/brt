@@ -122,7 +122,7 @@ fn bar(percentage: f32) -> Vec<Span<'static>> {
     );
     let empty_bar = vec![style_empty; 10];
 
-    let until = (percentage / 10.0) as usize;
+    let until = ((percentage / 10.0) as usize).min(10);
     let filled = &blocks[..until].to_vec();
     let emptied = &empty_bar[until..10].to_vec();
     let mut bar = vec![];
