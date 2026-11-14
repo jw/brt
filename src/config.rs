@@ -118,7 +118,7 @@ pub fn get_config_dir() -> PathBuf {
 }
 
 fn project_directory() -> Option<ProjectDirs> {
-    ProjectDirs::from("com", "kdheepak", env!("CARGO_PKG_NAME"))
+    ProjectDirs::from("com", "jw", env!("CARGO_PKG_NAME"))
 }
 
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
