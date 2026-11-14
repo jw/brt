@@ -99,6 +99,9 @@ pub struct ProcessesComponent {
 
 impl ProcessesComponent {
     pub fn jump(&mut self, steps: i64) {
+        if self.processes.is_empty() {
+            return;
+        }
         let location = self.state.selected().unwrap_or(0) as i64;
         let length = self.processes.len() as i64;
         info!(
@@ -303,5 +306,23 @@ impl Component for ProcessesComponent {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn jump_on_empty_process_list_does_not_panic() {
+        let mut component = ProcessesComponent::default();
+
+        component.jump(1);
+
+        assert_eq!(
+            component.state.selected(),
+            None,
+            "no row should become selected when there are no processes"
+        );
     }
 }
