@@ -26,32 +26,31 @@ pub struct UptimeWidget<'a> {
 }
 
 fn as_pretty_uptime(duration: Duration) -> String {
-    let months = duration.as_secs() / MONTH;
-    let months_token = if months == 1 { "month" } else { "months" };
-    let weeks = (duration.as_secs() / WEEK) % WEEK_MOD;
-    let weeks_token = if weeks == 1 { "week" } else { "weeks" };
-    let days = (duration.as_secs() / DAY) % DAY_MOD;
-    let days_token = if days == 1 { "day" } else { "days" };
-    let hours = (duration.as_secs() / HOUR) % HOUR_MOD;
-    let hours_token = if hours == 1 { "hour" } else { "hours" };
-    let minutes = (duration.as_secs() / MINUTE) % MINUTE_MOD;
-    let minutes_token = if minutes == 1 { "minute" } else { "minutes" };
-    let seconds = duration.as_secs() % 60;
-    let seconds_token = if seconds == 1 { "second" } else { "seconds" };
+    let total_secs = duration.as_secs();
+    let components = [
+        (total_secs / MONTH, "month", "months"),
+        ((total_secs / WEEK) % WEEK_MOD, "week", "weeks"),
+        ((total_secs / DAY) % DAY_MOD, "day", "days"),
+        ((total_secs / HOUR) % HOUR_MOD, "hour", "hours"),
+        ((total_secs / MINUTE) % MINUTE_MOD, "minute", "minutes"),
+        (total_secs % MINUTE, "second", "seconds"),
+    ];
 
-    if months == 0 && weeks == 0 && days == 0 && hours == 0 && minutes == 0 {
-        format!("{seconds} {seconds_token}")
-    } else if months == 0 && weeks == 0 && days == 0 && hours == 0 {
-        format!("{minutes} {minutes_token}, {seconds} {seconds_token}")
-    } else if months == 0 && weeks == 0 && days == 0 {
-        format!("{hours} {hours_token}, {minutes} {minutes_token}, {seconds} {seconds_token}")
-    } else if months == 0 && weeks == 0 {
-        format!("{days} {days_token}, {hours} {hours_token}, {minutes} {minutes_token}, {seconds} {seconds_token}")
-    } else if months == 0 {
-        format!("{weeks} {weeks_token}, {days} {days_token}, {hours} {hours_token}, {minutes} {minutes_token}, {seconds} {seconds_token}")
-    } else {
-        format!("{months} {months_token}, {weeks} {weeks_token}, {days} {days_token}, {hours} {hours_token}, {minutes} {minutes_token}, {seconds} {seconds_token}")
-    }
+    // Drop leading zero-valued components; everything from the first
+    // nonzero unit onward is kept even if it is itself zero.
+    let start = components
+        .iter()
+        .position(|(value, _, _)| *value != 0)
+        .unwrap_or(components.len() - 1);
+
+    components[start..]
+        .iter()
+        .map(|(value, singular, plural)| {
+            let token = if *value == 1 { singular } else { plural };
+            format!("{value} {token}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn widget<'a>(uptime: &mut UptimeWidget) -> Paragraph<'a> {
