@@ -266,14 +266,14 @@ impl Component for ProcessesComponent {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let [_, layout, _] = Layout::vertical([
-            Constraint::Length(1),                     // brt and battery
-            Constraint::Fill(frame.area().height - 2), // the process table
-            Constraint::Length(1),                     // debug line
+            Constraint::Length(1),                                   // brt and battery
+            Constraint::Fill(frame.area().height.saturating_sub(2)), // the process table
+            Constraint::Length(1),                                   // debug line
         ])
         .areas(area);
 
         // used by the PageUp and PageDown action
-        self.height = (layout.height - 4) as i64;
+        self.height = layout.height.saturating_sub(4) as i64;
 
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
             .begin_symbol(Some("↑"))
