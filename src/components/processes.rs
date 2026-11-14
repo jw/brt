@@ -14,6 +14,7 @@ use std::collections::VecDeque;
 use std::sync::mpsc as std_mpsc;
 use std::sync::mpsc::{Receiver as ThreadReceiver, Sender as ThreadSender};
 use std::thread;
+use std::time::Duration;
 use tracing::info;
 use uzers::get_user_by_uid;
 
@@ -86,6 +87,20 @@ fn get_cmdline_as_string(process: &Process) -> String {
     } else {
         "<zombie>".to_string()
     }
+}
+
+#[allow(dead_code)] // wired into Action::Update in the next changeset
+fn cpu_percentage(
+    previous_ticks: u64,
+    current_ticks: u64,
+    elapsed: Duration,
+    ticks_per_second: u64,
+) -> f64 {
+    if elapsed.is_zero() {
+        return 0.0;
+    }
+    let delta_ticks = current_ticks.saturating_sub(previous_ticks);
+    delta_ticks as f64 / ticks_per_second as f64 / elapsed.as_secs_f64() * 100.0
 }
 
 #[derive(Default)]
@@ -352,5 +367,33 @@ mod tests {
         component.jump(-1);
 
         assert_eq!(component.state.selected(), Some(2));
+    }
+
+    #[test]
+    fn cpu_percentage_is_zero_when_no_time_has_elapsed() {
+        let percentage = cpu_percentage(0, 100, Duration::ZERO, 100);
+
+        assert_eq!(percentage, 0.0);
+    }
+
+    #[test]
+    fn cpu_percentage_is_zero_when_ticks_are_unchanged() {
+        let percentage = cpu_percentage(100, 100, Duration::from_secs(1), 100);
+
+        assert_eq!(percentage, 0.0);
+    }
+
+    #[test]
+    fn cpu_percentage_of_a_fully_busy_core() {
+        let percentage = cpu_percentage(0, 100, Duration::from_secs(1), 100);
+
+        assert_eq!(percentage, 100.0);
+    }
+
+    #[test]
+    fn cpu_percentage_does_not_panic_when_ticks_go_backward() {
+        let percentage = cpu_percentage(100, 50, Duration::from_secs(1), 100);
+
+        assert_eq!(percentage, 0.0);
     }
 }
