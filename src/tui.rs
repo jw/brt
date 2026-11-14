@@ -147,7 +147,10 @@ impl Tui {
                         CrosstermEvent::Paste(s) => Event::Paste(s),
                         _ => continue, // ignore other events
                     }
-                    Some(Err(_)) => Event::Error,
+                    Some(Err(e)) => {
+                        error!("crossterm event stream error: {e:?}");
+                        Event::Error
+                    }
                     None => break, // the event stream has stopped and will not produce any more events
                 },
             };
