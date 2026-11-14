@@ -10,7 +10,7 @@ use ratatui::widgets::{
     TableState,
 };
 use ratatui::Frame;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc as std_mpsc;
 use std::sync::mpsc::{Receiver as ThreadReceiver, Sender as ThreadSender};
 use std::thread;
@@ -31,6 +31,7 @@ pub struct BrtProcess {
     pub cpus: VecDeque<f64>,
     pub cpu_graph: String,
     pub cpu: f64,
+    pub cpu_ticks: u64,
 }
 
 fn get_uid_as_string(process: &Process) -> String {
@@ -65,6 +66,7 @@ impl TryFrom<Process> for BrtProcess {
                 cpus: Default::default(),
                 cpu_graph: "foo".to_string(),
                 cpu: 0.0,
+                cpu_ticks: stat.utime + stat.stime,
             })
         } else {
             Err(())
@@ -89,7 +91,6 @@ fn get_cmdline_as_string(process: &Process) -> String {
     }
 }
 
-#[allow(dead_code)] // wired into Action::Update in the next changeset
 fn cpu_percentage(
     previous_ticks: u64,
     current_ticks: u64,
@@ -216,7 +217,7 @@ impl Component for ProcessesComponent {
             Action::Down => self.jump(1),
             Action::PageUp => self.jump(-self.height),
             Action::PageDown => self.jump(self.height),
-            Action::Update(_since) => {
+            Action::Update(since) => {
                 if let Some(rx) = self.rx.as_mut() {
                     let mut latest: Option<Vec<BrtProcess>> = None;
                     #[allow(clippy::while_let_loop)]
@@ -226,7 +227,28 @@ impl Component for ProcessesComponent {
                             Err(_) => break,
                         }
                     }
-                    if let Some(processes) = latest {
+                    if let Some(mut processes) = latest {
+                        // Known simplifications: a pid reused within one tick window would
+                        // be (wrongly) matched to the exited process's ticks, and a sample
+                        // is assumed to always be ready by the time this fires (true in
+                        // practice; processes_thread isn't throttled yet, see issue #44).
+                        let elapsed = Duration::from_millis(since as u64);
+                        let ticks_per_second = procfs::ticks_per_second();
+                        let previous_ticks: HashMap<i32, u64> = self
+                            .processes
+                            .iter()
+                            .map(|process| (process.pid, process.cpu_ticks))
+                            .collect();
+                        for process in &mut processes {
+                            if let Some(&previous) = previous_ticks.get(&process.pid) {
+                                process.cpu = cpu_percentage(
+                                    previous,
+                                    process.cpu_ticks,
+                                    elapsed,
+                                    ticks_per_second,
+                                );
+                            }
+                        }
                         self.processes = processes;
                         info!("Updated {} processes.", self.processes.len());
                         self.scrollbar_state =
@@ -395,5 +417,49 @@ mod tests {
         let percentage = cpu_percentage(100, 50, Duration::from_secs(1), 100);
 
         assert_eq!(percentage, 0.0);
+    }
+
+    #[test]
+    fn action_update_computes_cpu_percentage_from_the_previous_sample() {
+        let (tx, rx) = std_mpsc::channel();
+        let ticks_per_second = procfs::ticks_per_second();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            processes: vec![BrtProcess {
+                pid: 1,
+                cpu_ticks: 100,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        tx.send(vec![BrtProcess {
+            pid: 1,
+            cpu_ticks: 100 + ticks_per_second,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(1000)).unwrap();
+
+        assert_eq!(component.processes[0].cpu, 100.0);
+    }
+
+    #[test]
+    fn action_update_leaves_cpu_percentage_at_zero_for_a_newly_seen_process() {
+        let (tx, rx) = std_mpsc::channel();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            ..Default::default()
+        };
+
+        tx.send(vec![BrtProcess {
+            pid: 42,
+            cpu_ticks: 500,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(1000)).unwrap();
+
+        assert_eq!(component.processes[0].cpu, 0.0);
     }
 }
