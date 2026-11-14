@@ -10,7 +10,7 @@ use ratatui::widgets::{
     TableState,
 };
 use ratatui::Frame;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::mpsc as std_mpsc;
 use std::sync::mpsc::{Receiver as ThreadReceiver, Sender as ThreadSender};
 use std::thread;
@@ -28,8 +28,6 @@ pub struct BrtProcess {
     pub number_of_threads: i64,
     pub user: String,
     pub resident_memory: u64,
-    pub cpus: VecDeque<f64>,
-    pub cpu_graph: String,
     pub cpu: f64,
     pub cpu_ticks: u64,
 }
@@ -63,8 +61,6 @@ impl TryFrom<Process> for BrtProcess {
                 number_of_threads: stat.num_threads,
                 user: get_uid_as_string(&process),
                 resident_memory: get_memory(&process),
-                cpus: Default::default(),
-                cpu_graph: "foo".to_string(),
                 cpu: 0.0,
                 cpu_ticks: stat.utime + stat.stime,
             })
@@ -158,7 +154,6 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
                 .style(special_style)
                 .alignment(Alignment::Right),
         ),
-        Cell::new(Line::from("process.cpu_graph.to_string()")),
         Cell::new(format!("{:.2}", process.cpu)).style(special_style),
     ])
 }
@@ -292,7 +287,6 @@ impl Component for ProcessesComponent {
             Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
             Cell::new("User:"),
             Cell::new("MemB"),
-            Cell::new(""),
             Cell::new("Cpu%"),
         ]
         .iter()
@@ -323,7 +317,6 @@ impl Component for ProcessesComponent {
             Constraint::Percentage(5),
             Constraint::Percentage(5),
             Constraint::Length(7),
-            Constraint::Length(5),
             Constraint::Length(5),
         ];
 
