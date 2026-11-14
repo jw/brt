@@ -14,14 +14,18 @@ pub struct Cli {
     pub frame_rate: f64,
 }
 
-const VERSION_MESSAGE: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    "-",
-    env!("VERGEN_GIT_DESCRIBE"),
-    " (",
-    env!("VERGEN_BUILD_DATE"),
-    ")"
-);
+// `cargo install` builds from the crates.io tarball, which never contains a
+// `.git` directory, so vergen can't populate VERGEN_GIT_DESCRIBE there. Fall
+// back to "unknown" instead of hard-failing the build (see issue #60).
+fn version_message() -> String {
+    let git_describe = option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown");
+    format!(
+        "{}-{} ({})",
+        env!("CARGO_PKG_VERSION"),
+        git_describe,
+        env!("VERGEN_BUILD_DATE")
+    )
+}
 
 pub fn version() -> String {
     let author = clap::crate_authors!();
@@ -29,10 +33,11 @@ pub fn version() -> String {
     // let current_exe_path = PathBuf::from(clap::crate_name!()).display().to_string();
     let config_dir_path = get_config_dir().display().to_string();
     let data_dir_path = get_data_dir().display().to_string();
+    let version_message = version_message();
 
     format!(
         "\
-{VERSION_MESSAGE}
+{version_message}
 
 Authors: {author}
 
