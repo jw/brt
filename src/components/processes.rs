@@ -179,11 +179,18 @@ pub fn get_all_processes() -> Vec<BrtProcess> {
     processes
 }
 
+// Matches tui.rs's `component_interval` cadence, which is how often
+// Action::Update actually drains this thread's channel; scanning any
+// faster than that just burns a core for samples nobody reads (issue #44).
+const PROCESS_SCAN_INTERVAL: Duration = Duration::from_millis(200);
+
 fn processes_thread(thread_tx: ThreadSender<Vec<BrtProcess>>) {
     loop {
-        // TODO(jw): Add timing
         let processes = get_all_processes();
-        thread_tx.send(processes).unwrap();
+        if thread_tx.send(processes).is_err() {
+            break;
+        }
+        thread::sleep(PROCESS_SCAN_INTERVAL);
     }
 }
 
@@ -223,10 +230,8 @@ impl Component for ProcessesComponent {
                         }
                     }
                     if let Some(mut processes) = latest {
-                        // Known simplifications: a pid reused within one tick window would
-                        // be (wrongly) matched to the exited process's ticks, and a sample
-                        // is assumed to always be ready by the time this fires (true in
-                        // practice; processes_thread isn't throttled yet, see issue #44).
+                        // Known simplification: a pid reused within one tick window would
+                        // be (wrongly) matched to the exited process's ticks.
                         let elapsed = Duration::from_millis(since as u64);
                         let ticks_per_second = procfs::ticks_per_second();
                         let previous_ticks: HashMap<i32, u64> = self
