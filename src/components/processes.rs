@@ -313,6 +313,16 @@ impl Component for ProcessesComponent {
 mod tests {
     use super::*;
 
+    fn component_with_processes(count: usize, selected: usize) -> ProcessesComponent {
+        let mut state = TableState::default();
+        state.select(Some(selected));
+        ProcessesComponent {
+            processes: vec![BrtProcess::default(); count],
+            state,
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn jump_on_empty_process_list_does_not_panic() {
         let mut component = ProcessesComponent::default();
@@ -324,5 +334,23 @@ mod tests {
             None,
             "no row should become selected when there are no processes"
         );
+    }
+
+    #[test]
+    fn jump_forward_past_the_last_row_wraps_to_the_first() {
+        let mut component = component_with_processes(3, 2);
+
+        component.jump(1);
+
+        assert_eq!(component.state.selected(), Some(0));
+    }
+
+    #[test]
+    fn jump_backward_past_the_first_row_wraps_to_the_last() {
+        let mut component = component_with_processes(3, 0);
+
+        component.jump(-1);
+
+        assert_eq!(component.state.selected(), Some(2));
     }
 }
