@@ -1,7 +1,5 @@
 use clap::Parser;
 
-use crate::config::{get_config_dir, get_data_dir};
-
 #[derive(Parser, Debug)]
 #[command(author, version = version(), about)]
 pub struct Cli {
@@ -15,35 +13,17 @@ pub struct Cli {
 }
 
 // `cargo install` builds from the crates.io tarball, which never contains a
-// `.git` directory, so vergen can't populate VERGEN_GIT_DESCRIBE there. Fall
-// back to "unknown" instead of hard-failing the build (see issue #60).
-fn version_message() -> String {
-    let git_describe = option_env!("VERGEN_GIT_DESCRIBE").unwrap_or("unknown");
-    format!(
-        "{}-{} ({})",
-        env!("CARGO_PKG_VERSION"),
-        git_describe,
-        env!("VERGEN_BUILD_DATE")
-    )
-}
-
+// `.git` directory, so vergen can't populate VERGEN_GIT_DESCRIBE there — it
+// emits the env var as an empty string rather than leaving it unset (see
+// issue #60). Treat both "unset" and "empty" as "not available" and just
+// omit the suffix instead of showing a placeholder (see issue #62).
 pub fn version() -> String {
-    let author = clap::crate_authors!();
-
-    // let current_exe_path = PathBuf::from(clap::crate_name!()).display().to_string();
-    let config_dir_path = get_config_dir().display().to_string();
-    let data_dir_path = get_data_dir().display().to_string();
-    let version_message = version_message();
-
-    format!(
-        "\
-{version_message}
-
-Authors: {author}
-
-Config directory: {config_dir_path}
-Data directory: {data_dir_path}"
-    )
+    match option_env!("VERGEN_GIT_DESCRIBE") {
+        Some(git_describe) if !git_describe.is_empty() => {
+            format!("{} ({git_describe})", env!("CARGO_PKG_VERSION"))
+        }
+        _ => env!("CARGO_PKG_VERSION").to_string(),
+    }
 }
 
 #[cfg(test)]
