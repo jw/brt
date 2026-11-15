@@ -97,7 +97,19 @@ fn cpu_percentage(
         return 0.0;
     }
     let delta_ticks = current_ticks.saturating_sub(previous_ticks);
-    delta_ticks as f64 / ticks_per_second as f64 / elapsed.as_secs_f64() * 100.0
+    // `delta_ticks` only ever advances in whole kernel-tick units, but
+    // `elapsed` is a continuous wall-clock duration that's essentially
+    // never an exact multiple of one tick. Dividing a quantized numerator
+    // by a continuous denominator systematically undershoots — a process
+    // fully busy for the whole window still shows just under 100% (see
+    // issue #65). Rounding elapsed to the nearest whole tick puts both
+    // sides of the ratio in the same unit, so a genuinely fully-busy
+    // window reaches exactly 100%.
+    let elapsed_ticks = (elapsed.as_secs_f64() * ticks_per_second as f64).round();
+    if elapsed_ticks <= 0.0 {
+        return 0.0;
+    }
+    delta_ticks as f64 / elapsed_ticks * 100.0
 }
 
 // ~4s of trend at the 200ms Action::Update cadence, rendered as half as
@@ -470,6 +482,24 @@ mod tests {
     #[test]
     fn cpu_percentage_does_not_panic_when_ticks_go_backward() {
         let percentage = cpu_percentage(100, 50, Duration::from_secs(1), 100);
+
+        assert_eq!(percentage, 0.0);
+    }
+
+    #[test]
+    fn cpu_percentage_reaches_100_for_a_fully_busy_core_despite_sub_tick_jitter() {
+        // 203ms of wall-clock time, 20 whole ticks (10ms each) accumulated:
+        // the extra 3ms haven't produced a 21st tick yet, but the core was
+        // busy for the entire window. Before rounding elapsed to whole
+        // ticks, this undershot to 20 / 100 / 0.203 * 100 ≈ 98.5%.
+        let percentage = cpu_percentage(0, 20, Duration::from_millis(203), 100);
+
+        assert_eq!(percentage, 100.0);
+    }
+
+    #[test]
+    fn cpu_percentage_is_zero_when_elapsed_is_shorter_than_one_tick() {
+        let percentage = cpu_percentage(0, 1, Duration::from_millis(3), 100);
 
         assert_eq!(percentage, 0.0);
     }
