@@ -212,7 +212,11 @@ pub fn create_row<'a>(process: &BrtProcess, cpu_history: &VecDeque<f64>) -> Row<
                 .alignment(Alignment::Right),
         ),
         Cell::new(cpu_graph(cpu_history)).style(special_style),
-        Cell::new(format!("{:.1}", process.cpu)).style(special_style),
+        Cell::new(
+            Line::from(format!("{:.1}", process.cpu))
+                .style(special_style)
+                .alignment(Alignment::Right),
+        ),
     ])
 }
 
