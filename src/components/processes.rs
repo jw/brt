@@ -404,11 +404,15 @@ impl Component for ProcessesComponent {
             .row_highlight_style(selected_row_style);
 
         frame.render_stateful_widget(table, layout, &mut self.state);
+        // horizontal: 0 keeps the scrollbar's right edge on the border
+        // column itself, not one column further in — inset by 1 here
+        // landed it on top of the table's last real column (Cpu%),
+        // silently eating each row's last character (see issue #67).
         frame.render_stateful_widget(
             scrollbar,
             layout.inner(Margin {
                 vertical: 1,
-                horizontal: 1,
+                horizontal: 0,
             }),
             &mut self.scrollbar_state,
         );
