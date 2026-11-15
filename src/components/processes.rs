@@ -10,7 +10,7 @@ use ratatui::widgets::{
     TableState,
 };
 use ratatui::Frame;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::mpsc as std_mpsc;
 use std::sync::mpsc::{Receiver as ThreadReceiver, Sender as ThreadSender};
 use std::thread;
@@ -100,9 +100,46 @@ fn cpu_percentage(
     delta_ticks as f64 / ticks_per_second as f64 / elapsed.as_secs_f64() * 100.0
 }
 
+// ~4s of trend at the 200ms Action::Update cadence, rendered as half as
+// many Braille characters (two samples per character, see cpu_graph).
+const CPU_HISTORY_LEN: usize = 20;
+
+// Unicode Braille Patterns: each codepoint is 0x2800 | bits, with dots
+// arranged in a 2-wide x 4-tall grid:
+//   row0: left=0x01  right=0x08
+//   row1: left=0x02  right=0x10
+//   row2: left=0x04  right=0x20
+//   row3: left=0x40  right=0x80
+// Indexed by a 0..=4 bar height, filling dots bottom-up (row3 first) so a
+// column reads as a little bar chart rather than a single dot.
+const LEFT_DOTS: [u8; 5] = [0x00, 0x40, 0x44, 0x46, 0x47];
+const RIGHT_DOTS: [u8; 5] = [0x00, 0x80, 0xA0, 0xB0, 0xB8];
+
+fn dot_height(pct: f64) -> usize {
+    ((pct / 100.0).clamp(0.0, 1.0) * 4.0).round() as usize
+}
+
+/// Renders a CPU%-over-time history as Braille bar-graph characters, two
+/// samples (older, newer) packed per character for double the horizontal
+/// density of a one-sample-per-character scheme.
+fn cpu_graph(history: &VecDeque<f64>) -> String {
+    history
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+        .chunks(2)
+        .map(|pair| {
+            let left = LEFT_DOTS[dot_height(pair[0])];
+            let right = pair.get(1).map_or(0, |&p| RIGHT_DOTS[dot_height(p)]);
+            char::from_u32(0x2800 | left as u32 | right as u32).unwrap()
+        })
+        .collect()
+}
+
 #[derive(Default)]
 pub struct ProcessesComponent {
     processes: Vec<BrtProcess>,
+    cpu_history: HashMap<i32, VecDeque<f64>>,
     scrollbar_state: ScrollbarState,
     state: TableState,
     height: i64,
@@ -129,9 +166,17 @@ impl ProcessesComponent {
         self.state.select(Some(new_location));
         self.scrollbar_state = self.scrollbar_state.position(new_location);
     }
+
+    fn record_cpu_history(&mut self, pid: i32, cpu: f64) {
+        let history = self.cpu_history.entry(pid).or_default();
+        history.push_back(cpu);
+        if history.len() > CPU_HISTORY_LEN {
+            history.pop_front();
+        }
+    }
 }
 
-pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
+pub fn create_row<'a>(process: &BrtProcess, cpu_history: &VecDeque<f64>) -> Row<'a> {
     let special_style = Style::default().fg(Color::Rgb(0x0D, 0xE7, 0x56));
 
     let humansize_options: FormatSizeOptions = FormatSizeOptions::from(BINARY)
@@ -154,14 +199,20 @@ pub fn create_row<'a>(process: &BrtProcess) -> Row<'a> {
                 .style(special_style)
                 .alignment(Alignment::Right),
         ),
+        Cell::new(cpu_graph(cpu_history)).style(special_style),
         Cell::new(format!("{:.2}", process.cpu)).style(special_style),
     ])
 }
 
-pub fn create_rows(processes: &Vec<BrtProcess>) -> Vec<Row<'_>> {
+pub fn create_rows<'a>(
+    processes: &Vec<BrtProcess>,
+    cpu_history: &HashMap<i32, VecDeque<f64>>,
+) -> Vec<Row<'a>> {
+    let empty_history = VecDeque::new();
     let mut rows = Vec::new();
     for process in processes {
-        let row = create_row(process);
+        let history = cpu_history.get(&process.pid).unwrap_or(&empty_history);
+        let row = create_row(process, history);
         rows.push(row);
     }
     rows
@@ -248,7 +299,11 @@ impl Component for ProcessesComponent {
                                     ticks_per_second,
                                 );
                             }
+                            self.record_cpu_history(process.pid, process.cpu);
                         }
+                        let live_pids: HashSet<i32> =
+                            processes.iter().map(|process| process.pid).collect();
+                        self.cpu_history.retain(|pid, _| live_pids.contains(pid));
                         self.processes = processes;
                         info!("Updated {} processes.", self.processes.len());
                         self.scrollbar_state =
@@ -292,6 +347,7 @@ impl Component for ProcessesComponent {
             Cell::new(Line::from("Threads:").alignment(Alignment::Right)),
             Cell::new("User:"),
             Cell::new("MemB"),
+            Cell::new("Graph"),
             Cell::new("Cpu%"),
         ]
         .iter()
@@ -304,7 +360,7 @@ impl Component for ProcessesComponent {
                 .fg(Color::White),
         );
 
-        let rows = create_rows(&self.processes);
+        let rows = create_rows(&self.processes, &self.cpu_history);
         let processes = self.processes.len();
         let process = format!("{}/{}", self.state.selected().unwrap_or(0) + 1, processes);
 
@@ -322,6 +378,7 @@ impl Component for ProcessesComponent {
             Constraint::Percentage(5),
             Constraint::Percentage(5),
             Constraint::Length(7),
+            Constraint::Length(10),
             Constraint::Length(5),
         ];
 
@@ -418,6 +475,47 @@ mod tests {
     }
 
     #[test]
+    fn cpu_graph_renders_a_full_pair_at_the_extremes() {
+        let history = VecDeque::from([0.0, 100.0]);
+
+        let graph = cpu_graph(&history);
+
+        assert_eq!(graph, char::from_u32(0x28B8).unwrap().to_string());
+    }
+
+    #[test]
+    fn cpu_graph_renders_mid_range_levels() {
+        let history = VecDeque::from([25.0, 75.0]);
+
+        let graph = cpu_graph(&history);
+
+        assert_eq!(graph, char::from_u32(0x28F0).unwrap().to_string());
+    }
+
+    #[test]
+    fn cpu_graph_renders_a_trailing_unpaired_sample_with_only_its_left_dots() {
+        let history = VecDeque::from([50.0]);
+
+        let graph = cpu_graph(&history);
+
+        assert_eq!(graph, char::from_u32(0x2844).unwrap().to_string());
+    }
+
+    #[test]
+    fn record_cpu_history_keeps_only_the_most_recent_samples() {
+        let mut component = ProcessesComponent::default();
+
+        for sample in 0..(CPU_HISTORY_LEN + 5) {
+            component.record_cpu_history(1, sample as f64);
+        }
+
+        let history = &component.cpu_history[&1];
+        assert_eq!(history.len(), CPU_HISTORY_LEN);
+        assert_eq!(history.front(), Some(&5.0));
+        assert_eq!(history.back(), Some(&(CPU_HISTORY_LEN as f64 + 4.0)));
+    }
+
+    #[test]
     fn action_update_computes_cpu_percentage_from_the_previous_sample() {
         let (tx, rx) = std_mpsc::channel();
         let ticks_per_second = procfs::ticks_per_second();
@@ -459,5 +557,38 @@ mod tests {
         component.update(Action::Update(1000)).unwrap();
 
         assert_eq!(component.processes[0].cpu, 0.0);
+    }
+
+    #[test]
+    fn action_update_prunes_cpu_history_for_processes_that_have_exited() {
+        let (tx, rx) = std_mpsc::channel();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            processes: vec![BrtProcess {
+                pid: 1,
+                cpu_ticks: 100,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        component.cpu_history.insert(1, VecDeque::from([10.0]));
+        component.cpu_history.insert(2, VecDeque::from([20.0]));
+
+        tx.send(vec![BrtProcess {
+            pid: 1,
+            cpu_ticks: 200,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(1000)).unwrap();
+
+        assert!(
+            component.cpu_history.contains_key(&1),
+            "a still-running pid's history should survive"
+        );
+        assert!(
+            !component.cpu_history.contains_key(&2),
+            "an exited pid's history should be pruned"
+        );
     }
 }
