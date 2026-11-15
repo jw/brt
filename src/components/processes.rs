@@ -112,6 +112,14 @@ fn cpu_percentage(
     delta_ticks as f64 / elapsed_ticks * 100.0
 }
 
+// cpu_percentage()'s resolution is ~100% / (ticks_per_second * window): at
+// the ~200ms Action::Update cadence that's only ~20 ticks of window, so
+// readings could only ever land on multiples of ~5%. Comparing each
+// process against a periodically-refreshed anchor (cpu_window_anchor
+// below) instead of the immediately-previous sample widens that window to
+// this duration, trading a little responsiveness for much finer steps.
+const CPU_WINDOW: Duration = Duration::from_secs(1);
+
 // ~4s of trend at the 200ms Action::Update cadence, rendered as half as
 // many Braille characters (two samples per character, see cpu_graph).
 const CPU_HISTORY_LEN: usize = 20;
@@ -152,6 +160,8 @@ fn cpu_graph(history: &VecDeque<f64>) -> String {
 pub struct ProcessesComponent {
     processes: Vec<BrtProcess>,
     cpu_history: HashMap<i32, VecDeque<f64>>,
+    // (ticks at the start of this pid's current window, elapsed since then)
+    cpu_window_anchor: HashMap<i32, (u64, Duration)>,
     scrollbar_state: ScrollbarState,
     state: TableState,
     height: i64,
@@ -301,25 +311,35 @@ impl Component for ProcessesComponent {
                         // be (wrongly) matched to the exited process's ticks.
                         let elapsed = Duration::from_millis(since as u64);
                         let ticks_per_second = procfs::ticks_per_second();
-                        let previous_ticks: HashMap<i32, u64> = self
-                            .processes
-                            .iter()
-                            .map(|process| (process.pid, process.cpu_ticks))
-                            .collect();
                         for process in &mut processes {
-                            if let Some(&previous) = previous_ticks.get(&process.pid) {
-                                process.cpu = cpu_percentage(
-                                    previous,
-                                    process.cpu_ticks,
-                                    elapsed,
-                                    ticks_per_second,
-                                );
+                            match self.cpu_window_anchor.get_mut(&process.pid) {
+                                Some((anchor_ticks, anchor_elapsed)) => {
+                                    *anchor_elapsed += elapsed;
+                                    process.cpu = cpu_percentage(
+                                        *anchor_ticks,
+                                        process.cpu_ticks,
+                                        *anchor_elapsed,
+                                        ticks_per_second,
+                                    );
+                                    if *anchor_elapsed >= CPU_WINDOW {
+                                        *anchor_ticks = process.cpu_ticks;
+                                        *anchor_elapsed = Duration::ZERO;
+                                    }
+                                }
+                                None => {
+                                    // First time seeing this pid: nothing to compare against
+                                    // yet, so it starts its own window from here.
+                                    self.cpu_window_anchor
+                                        .insert(process.pid, (process.cpu_ticks, Duration::ZERO));
+                                }
                             }
                             self.record_cpu_history(process.pid, process.cpu);
                         }
                         let live_pids: HashSet<i32> =
                             processes.iter().map(|process| process.pid).collect();
                         self.cpu_history.retain(|pid, _| live_pids.contains(pid));
+                        self.cpu_window_anchor
+                            .retain(|pid, _| live_pids.contains(pid));
                         self.processes = processes;
                         info!("Updated {} processes.", self.processes.len());
                         self.scrollbar_state =
@@ -559,11 +579,7 @@ mod tests {
         let ticks_per_second = procfs::ticks_per_second();
         let mut component = ProcessesComponent {
             rx: Some(rx),
-            processes: vec![BrtProcess {
-                pid: 1,
-                cpu_ticks: 100,
-                ..Default::default()
-            }],
+            cpu_window_anchor: HashMap::from([(1, (100, Duration::ZERO))]),
             ..Default::default()
         };
 
@@ -595,6 +611,81 @@ mod tests {
         component.update(Action::Update(1000)).unwrap();
 
         assert_eq!(component.processes[0].cpu, 0.0);
+    }
+
+    #[test]
+    fn cpu_window_anchor_accumulates_elapsed_without_resetting_mid_window() {
+        let (tx, rx) = std_mpsc::channel();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            cpu_window_anchor: HashMap::from([(1, (0, Duration::ZERO))]),
+            ..Default::default()
+        };
+
+        tx.send(vec![BrtProcess {
+            pid: 1,
+            cpu_ticks: 7,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(300)).unwrap();
+
+        assert_eq!(
+            component.cpu_window_anchor[&1],
+            (0, Duration::from_millis(300)),
+            "anchor ticks should stay put and elapsed should accumulate until CPU_WINDOW is reached"
+        );
+    }
+
+    #[test]
+    fn cpu_window_anchor_resets_once_the_window_elapses() {
+        let (tx, rx) = std_mpsc::channel();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            cpu_window_anchor: HashMap::from([(1, (0, Duration::from_millis(900)))]),
+            ..Default::default()
+        };
+
+        tx.send(vec![BrtProcess {
+            pid: 1,
+            cpu_ticks: 42,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(200)).unwrap();
+
+        assert_eq!(
+            component.cpu_window_anchor[&1],
+            (42, Duration::ZERO),
+            "crossing CPU_WINDOW should re-anchor on the current ticks and restart the elapsed clock"
+        );
+    }
+
+    #[test]
+    fn action_update_prunes_cpu_window_anchor_for_processes_that_have_exited() {
+        let (tx, rx) = std_mpsc::channel();
+        let mut component = ProcessesComponent {
+            rx: Some(rx),
+            cpu_window_anchor: HashMap::from([(1, (0, Duration::ZERO)), (2, (0, Duration::ZERO))]),
+            ..Default::default()
+        };
+
+        tx.send(vec![BrtProcess {
+            pid: 1,
+            cpu_ticks: 5,
+            ..Default::default()
+        }])
+        .unwrap();
+        component.update(Action::Update(200)).unwrap();
+
+        assert!(
+            component.cpu_window_anchor.contains_key(&1),
+            "a still-running pid's anchor should survive"
+        );
+        assert!(
+            !component.cpu_window_anchor.contains_key(&2),
+            "an exited pid's anchor should be pruned"
+        );
     }
 
     #[test]
