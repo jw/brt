@@ -253,6 +253,26 @@ impl DerefMut for Tui {
     }
 }
 
+/// Leaves raw mode, the alternate screen, mouse capture, and bracketed
+/// paste, without needing a live [`Tui`] instance. Disabling a mode that
+/// was never enabled is a no-op, so this is safe to call from a panic hook
+/// that doesn't know what state the terminal was left in — and unlike
+/// [`Tui::new`], it doesn't spawn a task, which would itself panic if
+/// called from outside a Tokio runtime.
+pub fn restore_terminal() -> Result<()> {
+    if crossterm::terminal::is_raw_mode_enabled()? {
+        crossterm::execute!(
+            stdout(),
+            DisableBracketedPaste,
+            DisableMouseCapture,
+            LeaveAlternateScreen,
+            cursor::Show
+        )?;
+        crossterm::terminal::disable_raw_mode()?;
+    }
+    Ok(())
+}
+
 impl Drop for Tui {
     fn drop(&mut self) {
         self.cancel();
